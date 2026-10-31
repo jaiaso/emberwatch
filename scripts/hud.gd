@@ -83,6 +83,7 @@ func setup(controller) -> void:
 	_make_help()
 	_make_outcome()
 	_make_bonus()
+	_button(root, "画質 [F8]", Rect2(800,14,96,35), func(): game.toggle_quality())
 	audio_button = _button(root, "音 [M]", Rect2(908, 14, 80, 35), func(): game.sound.toggle())
 	Session.changed.connect(refresh_mode)
 	Session.message.connect(toast)
@@ -181,7 +182,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.1.0     —     峡谷と実り", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.2.0     —     光と鋼", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -189,7 +190,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.1.0", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.2.0", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -273,7 +274,7 @@ func _make_lobby() -> void:
 	lobby_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	start_button = _button(lobby, "全員で出陣", Rect2(28, 240, 270, 43), func(): Session.start(), true)
 	_button(lobby, "タイトルへ", Rect2(311, 240, 137, 43), func(): Session.back_to_menu())
-	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.1.0", Vector2(28, 298), 11, MUTED)
+	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.2.0", Vector2(28, 298), 11, MUTED)
 
 func _make_help() -> void:
 	help_panel = _panel(root, Rect2(230, 87, 692, 535), Color(0.05, 0.12, 0.10, 0.99))

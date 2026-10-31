@@ -32,6 +32,9 @@ var last_match = -1
 var rally_mode = false
 var double_select = false
 var closing = false
+var world_environment: Environment
+var sun_light: DirectionalLight3D
+var high_quality = true
 
 func _ready() -> void:
 	_setup_world()
@@ -97,23 +100,41 @@ func _setup_world() -> void:
 	add_child(art.terrain())
 	var world = WorldEnvironment.new()
 	var environment = Environment.new()
-	environment.background_mode = Environment.BG_COLOR
-	environment.background_color = Color("293f36")
-	environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	environment.ambient_light_color = Color("bac2a2")
+	world_environment = environment
+	environment.background_mode = Environment.BG_SKY
+	var sky = Sky.new()
+	var sky_material = ProceduralSkyMaterial.new()
+	sky_material.sky_top_color = Color("496a8a")
+	sky_material.sky_horizon_color = Color("c2c9bf")
+	sky_material.ground_horizon_color = Color("aaa98a")
+	sky.sky_material = sky_material
+	environment.sky = sky
+	environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	environment.ambient_light_energy = 0.65
-	environment.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	environment.tonemap_mode = Environment.TONE_MAPPER_ACES
+	environment.tonemap_exposure = 1.15
+	environment.ssao_enabled = true
+	environment.ssao_radius = 1.2
+	environment.ssao_intensity = 1.3
+	environment.ssao_power = 1.3
+	environment.glow_enabled = true
+	environment.glow_intensity = 0.35
+	environment.glow_hdr_threshold = 1.5
 	environment.fog_enabled = true
-	environment.fog_light_color = Color("516756")
-	environment.fog_density = 0.005
+	environment.fog_light_color = Color("9daea9")
+	environment.fog_density = 0.0018
+	environment.fog_sun_scatter = 0.3
 	world.environment = environment
 	add_child(world)
 	var sun = DirectionalLight3D.new()
-	sun.rotation_degrees = Vector3(-52, -32, 0)
-	sun.light_color = Color("ffddb0")
-	sun.light_energy = 1.15
+	sun_light = sun
+	sun.rotation_degrees = Vector3(-48,-32,0)
+	sun.light_color = Color("ffe0b5")
+	sun.light_energy = 1.75
+	sun.light_angular_distance = 0.8
 	sun.shadow_enabled = true
-	sun.directional_shadow_max_distance = 100
+	sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
+	sun.directional_shadow_max_distance = 130
 	add_child(sun)
 	camera = Camera3D.new()
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
@@ -263,6 +284,13 @@ func _sync_models(delta: float) -> void:
 		body.rotation.z = sin(float(unit.anim) * 16.0) * 0.12 if unit.order in ["gather", "construct"] and moved < 0.03 else 0.0
 		var swing: float = clampf((sim.elapsed - unit.get("attack_at", -10.0)) / 0.3, 0, 1)
 		body.rotation.x = sin(swing * PI) * 0.4
+		var stride = sin(float(unit.anim)*8.5) * 0.6 if moved > 0.02 else 0.0
+		body.get_node("LegL").rotation.x = stride
+		body.get_node("LegR").rotation.x = -stride
+		body.get_node("ArmL").rotation.x = -stride * 0.7
+		body.get_node("ArmR").rotation.x = stride * 0.7 - sin(swing*PI)*1.4
+		if unit.order in ["gather","construct"] and moved < 0.03:
+			body.get_node("ArmR").rotation.x = -0.8 + sin(float(unit.anim)*6.0)*0.65
 		model.get_node("Selection").visible = unit.id in selected
 	for building in sim.buildings.values():
 		if not entities.has(building.id):
@@ -325,7 +353,19 @@ func _input(event: InputEvent) -> void:
 		_select_rectangle(Input.is_physical_key_pressed(KEY_SHIFT))
 		get_viewport().set_input_as_handled()
 
+func toggle_quality() -> void:
+	high_quality = not high_quality
+	world_environment.ssao_enabled = high_quality
+	world_environment.glow_enabled = high_quality
+	sun_light.directional_shadow_max_distance = 130 if high_quality else 70
+	get_viewport().msaa_3d = Viewport.MSAA_4X if high_quality else Viewport.MSAA_2X
+	if hud != null:
+		hud.toast("画質：高品質" if high_quality else "画質：標準")
+
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
+		toggle_quality()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
 		sound.toggle()
 		return

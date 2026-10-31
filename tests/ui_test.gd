@@ -106,6 +106,11 @@ func run() -> void:
 	await process_frame
 	check(session.sim.players[1].skills.harvest == 1 and session.sim.players[1].skill_points == 0, "card click spends own reward")
 	check(not game.hud.bonus_panel.visible, "bonus closes after choice")
+	await key(KEY_F8)
+	check(not game.high_quality and not game.world_environment.ssao_enabled, "F8 selects standard graphics")
+	await key(KEY_F8)
+	check(game.high_quality and game.world_environment.ssao_enabled, "F8 restores enhanced graphics")
+	check(game.entities.values().any(func(node): return node.has_node("Body/ArmR") and node.has_node("Body/LegL")), "articulated models attached to simulation units")
 	print("UI_TEST ", checks - failures.size(), "/", checks, " PASS; failures=", failures)
 	game.queue_free()
 	await process_frame

@@ -6,6 +6,8 @@ PS1時代を思わせるローポリゴン、粗い画面、落ち着いた色�
 
 **Godot 4.5.1 / Windows x64 / 1〜4人協力プレイ / 日本語UI**
 
+[Windows版・編集用ソースのダウンロード（v0.1.0）](https://github.com/jaiaso/emberwatch/releases/tag/v0.1.0)
+
 変更内容は[CHANGELOG](CHANGELOG.md)、動作確認の範囲は[検証結果](docs/verification.md)を参照してください。
 
 ## すぐ遊ぶ

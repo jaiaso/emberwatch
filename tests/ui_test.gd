@@ -14,11 +14,12 @@ func check(condition: bool, label: String) -> void:
 		failures.append(label)
 		push_error("FAIL: " + label)
 
-func key(code: Key) -> void:
+func key(code: Key, ctrl: bool = false) -> void:
 	var event = InputEventKey.new()
 	event.keycode = code
 	event.physical_keycode = code
 	event.pressed = true
+	event.ctrl_pressed = ctrl
 	Input.parse_input_event(event)
 	await process_frame
 	event = event.duplicate()
@@ -41,6 +42,7 @@ func click(point: Vector2) -> void:
 
 func run() -> void:
 	session = root.get_node("Session")
+	session.allow_autosave = false
 	game = load("res://main.tscn").instantiate()
 	root.add_child(game)
 	await process_frame
@@ -48,7 +50,7 @@ func run() -> void:
 	print("UI_GEOMETRY ", root.size, " transform=", root.get_final_transform(), " root_rect=", game.hud.root.get_global_rect())
 	check(game.hud.menu.visible and not game.hud.play_ui.visible, "title visible on launch")
 	# Click the actual title button, then operate the normal input path.
-	await click(Vector2(230, 390))
+	await click(Vector2(200, 363))
 	check(session.mode == "solo" and session.sim.running and game.hud.play_ui.visible, "title button starts solo game")
 	if session.mode != "solo":
 		quit(1)
@@ -74,7 +76,28 @@ func run() -> void:
 	await key(KEY_M)
 	check(game.sound.muted, "M mutes music and sound")
 	await key(KEY_1)
-	check(session.sim.population() == 7, "1 recruits a worker through input")
+	check(session.sim.population() == 6 and session.sim.queued_population() == 1, "1 queues worker through input")
+	for i in range(70):
+		session.sim.step(0.05)
+	check(session.sim.population() == 7, "worker finishes training")
+	await key(KEY_6, true)
+	game.selected.clear()
+	await key(KEY_6)
+	check(game.selected.size() == 3, "control group restores army selection")
+	await key(KEY_P)
+	var before: float = session.sim.elapsed
+	session.sim.step(1)
+	check(session.sim.paused and session.sim.elapsed == before, "P pauses solo simulation")
+	await key(KEY_P)
+	check(not session.sim.paused, "P resumes solo simulation")
+	await click(Vector2(450, 576))
+	check(game.hud.active_tab == 1 and game.hud.tabs[1].visible, "building tab opens")
+	await click(Vector2(620, 576))
+	check(game.hud.active_tab == 2 and game.hud.tabs[2].visible, "upgrade tab opens")
+	await key(KEY_Y)
+	check(game.rally_mode, "Y enables rally placement")
+	await key(KEY_ESCAPE)
+	check(not game.rally_mode and not game.hud.help_panel.visible, "Escape cancels rally placement")
 	print("UI_TEST ", checks - failures.size(), "/", checks, " PASS; failures=", failures)
 	game.queue_free()
 	await process_frame

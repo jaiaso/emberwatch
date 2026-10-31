@@ -11,7 +11,7 @@ func _ready() -> void:
 	for key in ["select", "order", "build", "wave", "victory", "defeat"]:
 		cues[key] = load("res://assets/audio/%s.wav" % key)
 	effects = AudioStreamPlayer.new()
-	effects.max_polyphony = 6
+	effects.max_polyphony = 1
 	effects.volume_db = -13
 	add_child(effects)
 	music = AudioStreamPlayer.new()
@@ -22,7 +22,8 @@ func _ready() -> void:
 	music.stream = stream
 	music.volume_db = -24
 	add_child(music)
-	music.play()
+	if DisplayServer.get_name() != "headless":
+		music.play()
 
 func toggle() -> void:
 	muted = not muted
@@ -30,6 +31,9 @@ func toggle() -> void:
 	effects.volume_db = -80 if muted else -13
 
 func _exit_tree() -> void:
+	shutdown()
+
+func shutdown() -> void:
 	if is_instance_valid(effects):
 		effects.stop()
 		effects.stream = null
@@ -39,7 +43,8 @@ func _exit_tree() -> void:
 	cues.clear()
 
 func cue(key: String) -> void:
-	if not muted and cues.has(key):
+	if not muted and cues.has(key) and DisplayServer.get_name() != "headless":
+		effects.stop()
 		effects.stream = cues[key]
 		effects.play()
 

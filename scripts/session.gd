@@ -7,6 +7,9 @@ signal pinged(pos: Vector2)
 
 const Simulation = preload("res://scripts/simulation.gd")
 const PORT = 27840
+const VERSION = "1.0.0"
+const SAVE_PATH = "user://emberwatch-v1.save"
+const SAVE_MAGIC = "EMBERWATCH_SAVE_1"
 var sim = Simulation.new()
 var mode = "menu"
 var status = ""
@@ -17,6 +20,9 @@ var command_windows: Dictionary = {}
 var send_serial = 0
 var receive_serial = -1
 var assemblies: Dictionary = {}
+var welcomed = false
+var allow_autosave = true
+var saved_wave = 0
 
 func _ready() -> void:
 	sim.reset()
@@ -30,12 +36,15 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if mode in ["solo", "host"]:
 		sim.step(delta)
+		if mode == "solo" and allow_autosave and sim.cleared_wave > saved_wave and sim.running:
+			saved_wave = sim.cleared_wave
+			save_game(false)
 		if mode == "host":
 			snapshot_time += delta
 			if snapshot_time >= 0.1:
 				snapshot_time = 0.0
 				_send_state()
-	elif mode == "connecting":
+	elif mode == "connecting" or (mode == "client" and not welcomed):
 		connect_time += delta
 		if connect_time > 9.0:
 			_failed()
@@ -48,6 +57,7 @@ func _close() -> void:
 	assemblies.clear()
 	send_serial = 0
 	receive_serial = -1
+	welcomed = false
 
 func back_to_menu() -> void:
 	_close()
@@ -58,14 +68,21 @@ func back_to_menu() -> void:
 	status = ""
 	changed.emit()
 
-func solo() -> void:
+func solo(level: int = -1) -> void:
 	back_to_menu()
+	if level >= 0:
+		sim.difficulty = clampi(level, 0, 2)
+	sim.next_wave = [85.0, 70.0, 60.0][sim.difficulty]
+	saved_wave = 0
 	mode = "solo"
 	sim.running = true
 	changed.emit()
 
-func host() -> void:
+func host(level: int = -1) -> void:
 	back_to_menu()
+	if level >= 0:
+		sim.difficulty = clampi(level, 0, 2)
+	sim.next_wave = [85.0, 70.0, 60.0][sim.difficulty]
 	var peer = ENetMultiplayerPeer.new()
 	var error = peer.create_server(PORT, 3)
 	if error != OK:
@@ -95,7 +112,7 @@ func start() -> void:
 	if mode == "host" and sim.result == "":
 		sim.running = true
 		status = ""
-		_welcome.rpc(sim.snapshot())
+		_welcome.rpc(_snapshot())
 		changed.emit()
 
 func _peer_connected(id: int) -> void:
@@ -104,13 +121,34 @@ func _peer_connected(id: int) -> void:
 	if sim.result != "":
 		multiplayer.multiplayer_peer.disconnect_peer(id)
 		return
-	sim.add_player(id)
-	_welcome.rpc_id(id, sim.snapshot())
+	get_tree().create_timer(7.0).timeout.connect(func():
+		if mode == "host" and id in multiplayer.get_peers() and not sim.players.has(id):
+			multiplayer.multiplayer_peer.disconnect_peer(id))
+
+@rpc("any_peer", "call_remote", "reliable", 0)
+func _hello(version: String) -> void:
+	if mode != "host":
+		return
+	var sender = multiplayer.get_remote_sender_id()
+	if sim.players.has(sender):
+		return
+	if version != VERSION:
+		_reject.rpc_id(sender)
+		return
+	sim.add_player(sender)
+	_welcome.rpc_id(sender, _snapshot())
+	changed.emit()
+
+@rpc("authority", "call_remote", "reliable", 0)
+func _reject() -> void:
+	back_to_menu()
+	status = "バージョンが違います。全員 v%s を使用してください。" % VERSION
 	changed.emit()
 
 func _peer_disconnected(id: int) -> void:
 	if mode == "host":
-		sim.remove_player(id)
+		if sim.players.has(id):
+			sim.remove_player(id)
 		command_windows.erase(id)
 		changed.emit()
 
@@ -118,11 +156,12 @@ func _connected() -> void:
 	mode = "client"
 	local_id = multiplayer.get_unique_id()
 	status = "ホストの出陣を待っています。"
+	_hello.rpc_id(1, VERSION)
 	changed.emit()
 
 func _failed() -> void:
 	back_to_menu()
-	status = "接続できませんでした。IPアドレスとホストを確認してください。"
+	status = "接続できません。IP・ホスト・全員のバージョンを確認してください。"
 	changed.emit()
 
 func _server_left() -> void:
@@ -132,14 +171,23 @@ func _server_left() -> void:
 
 @rpc("authority", "call_remote", "reliable", 0)
 func _welcome(state: Dictionary) -> void:
+	if state.get("protocol", "") != VERSION:
+		_reject()
+		return
 	sim.apply_snapshot(state)
+	welcomed = true
 	changed.emit()
+
+func _snapshot() -> Dictionary:
+	var state: Dictionary = sim.snapshot()
+	state.protocol = VERSION
+	return state
 
 func _send_state() -> void:
 	if multiplayer.get_peers().is_empty():
 		return
 	send_serial += 1
-	var bytes = var_to_bytes(sim.snapshot()).compress(FileAccess.COMPRESSION_GZIP)
+	var bytes = var_to_bytes(_snapshot()).compress(FileAccess.COMPRESSION_GZIP)
 	var count = int(ceil(float(bytes.size()) / 900.0))
 	for index in range(count):
 		_state_part.rpc(send_serial, index, count, bytes.slice(index * 900, mini((index + 1) * 900, bytes.size())))
@@ -170,7 +218,7 @@ func _state_part(serial: int, index: int, count: int, data: PackedByteArray) -> 
 		_receive_state(decoded)
 
 func _receive_state(state: Dictionary) -> void:
-	if mode != "client" or int(state.tick) < sim.tick:
+	if mode != "client" or int(state.tick) < sim.tick or state.get("match_id", -1) != sim.match_id:
 		return
 	var was_running: bool = sim.running
 	var old_result: String = sim.result
@@ -179,6 +227,13 @@ func _receive_state(state: Dictionary) -> void:
 		changed.emit()
 
 func issue(action: String, ids: Array = [], pos: Vector2 = Vector2.ZERO, extra: String = "") -> void:
+	if action == "pause":
+		if mode == "solo" and sim.running:
+			sim.paused = not sim.paused
+		return
+	if action == "save":
+		save_game()
+		return
 	if mode == "client":
 		_request.rpc_id(1, action, ids, pos, extra)
 	elif mode in ["solo", "host"]:
@@ -218,3 +273,80 @@ func _feedback(text: String) -> void:
 @rpc("authority", "call_remote", "reliable", 0)
 func _ping(pos: Vector2) -> void:
 	pinged.emit(pos)
+
+func rematch() -> void:
+	if mode not in ["solo", "host"]:
+		return
+	var peers = sim.players.keys()
+	sim.reset()
+	for id in peers:
+		sim.add_player(id)
+	sim.next_wave = [85.0, 70.0, 60.0][sim.difficulty]
+	saved_wave = 0
+	sim.running = true
+	if mode == "host":
+		_welcome.rpc(_snapshot())
+	changed.emit()
+
+func save_game(notify: bool = true) -> bool:
+	if mode != "solo" or not sim.running:
+		if notify:
+			message.emit("セーブはソロプレイ中に利用できます。")
+		return false
+	var file = FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	if file == null:
+		message.emit("セーブできませんでした。")
+		return false
+	var payload = var_to_bytes({"version": VERSION, "state": sim.snapshot()})
+	var hash = HashingContext.new()
+	hash.start(HashingContext.HASH_SHA256)
+	hash.update(payload)
+	file.store_line(SAVE_MAGIC)
+	file.store_32(payload.size())
+	file.store_buffer(hash.finish())
+	file.store_buffer(payload)
+	file.close()
+	if notify:
+		message.emit("進行状況をセーブしました。")
+	return true
+
+func has_save() -> bool:
+	return FileAccess.file_exists(SAVE_PATH)
+
+func continue_game() -> bool:
+	if mode != "menu" or not has_save():
+		return false
+	var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
+	if file == null or file.get_length() > 4000000:
+		return false
+	if file.get_line() != SAVE_MAGIC or file.get_length() - file.get_position() < 36:
+		file.close()
+		return false
+	var size = file.get_32()
+	var expected = file.get_buffer(32)
+	if size != file.get_length() - file.get_position():
+		file.close()
+		return false
+	var payload = file.get_buffer(size)
+	file.close()
+	var hash = HashingContext.new()
+	hash.start(HashingContext.HASH_SHA256)
+	hash.update(payload)
+	if hash.finish() != expected:
+		return false
+	var data = bytes_to_var(payload)
+	if not data is Dictionary or data.get("version", "") != VERSION or not data.get("state", {}) is Dictionary:
+		status = "セーブデータを読み込めませんでした。"
+		changed.emit()
+		return false
+	var state: Dictionary = data.state
+	for key in ["units", "buildings", "resources", "players", "stock", "elapsed", "wave", "next_wave", "running", "result", "event_text", "event_serial", "tick"]:
+		if not state.has(key):
+			return false
+	back_to_menu()
+	sim.apply_snapshot(state)
+	sim.paused = false
+	saved_wave = sim.cleared_wave
+	mode = "solo"
+	changed.emit()
+	return true

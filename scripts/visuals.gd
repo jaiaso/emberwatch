@@ -64,11 +64,14 @@ func make_unit(kind: String, team: Color) -> Node3D:
 	var body = Node3D.new()
 	body.name = "Body"
 	root.add_child(body)
-	var enemy = kind in ["raider", "brute"]
+	var enemy = kind in ["raider", "brute", "slinger", "warlord"]
 	var cloth = Color("9c4b3c") if enemy else team
 	var skin = Color("c3a17d") if not enemy else Color("a38a70")
 	if kind == "brute":
 		body.scale = Vector3.ONE * 1.45
+	if kind == "warlord":
+		body.scale = Vector3.ONE * 1.8
+		cloth = Color("704032")
 	box(body, Vector3(0.4, 0.57, 0.29), Vector3(0, 0.8, 0), cloth)
 	box(body, Vector3(0.14, 0.42, 0.18), Vector3(-0.12, 0.3, 0), Color("3d3d38"))
 	box(body, Vector3(0.14, 0.42, 0.18), Vector3(0.12, 0.3, 0), Color("3d3d38"))
@@ -79,7 +82,7 @@ func make_unit(kind: String, team: Color) -> Node3D:
 		cylinder(body, 0.25, 0.14, 0.16, Vector3(0, 1.45, 0), Color("ccad6c"))
 		box(body, Vector3(0.06, 0.72, 0.06), Vector3(0.36, 0.95, 0.05), Color("69513b"))
 		box(body, Vector3(0.3, 0.16, 0.11), Vector3(0.43, 1.22, 0.05), Color("b3b4a3"))
-	elif kind == "archer":
+	elif kind in ["archer", "slinger"]:
 		cylinder(body, 0.21, 0, 0.28, Vector3(0, 1.51, 0), team.darkened(0.35))
 		var bow = cylinder(body, 0.025, 0.025, 0.95, Vector3(0.35, 0.95, -0.13), Color("b7a076"), 4)
 		bow.rotation.z = -0.25
@@ -89,6 +92,10 @@ func make_unit(kind: String, team: Color) -> Node3D:
 		box(body, Vector3(0.12, 0.8, 0.07), Vector3(0.37, 1.05, 0), Color("bbc8bf"))
 		box(body, Vector3(0.3, 0.07, 0.09), Vector3(0.37, 0.82, 0), Color("897753"))
 		box(body, Vector3(0.09, 0.51, 0.4), Vector3(-0.35, 0.86, 0), cloth.darkened(0.28))
+	if kind == "warlord":
+		cylinder(body, 0.25, 0.25, 0.18, Vector3(0, 1.58, 0), Color("d1ad63"), 5)
+		for x in [-0.18, 0, 0.18]:
+			box(body, Vector3(0.07, 0.2, 0.07), Vector3(x, 1.73, 0), Color("d1ad63"))
 	var ring_mesh = TorusMesh.new()
 	ring_mesh.inner_radius = 0.5
 	ring_mesh.outer_radius = 0.57

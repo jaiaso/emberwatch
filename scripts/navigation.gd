@@ -1,5 +1,6 @@
 extends RefCounted
 ## Static building obstacles use A*. Moving armies use local separation.
+const Terrain = preload("res://scripts/terrain_data.gd")
 var grid = AStarGrid2D.new()
 var signature = ""
 var version = 0
@@ -10,22 +11,27 @@ func rebuild(buildings: Dictionary, definitions: Dictionary) -> void:
 		return
 	signature = next_signature
 	version += 1
-	grid.region = Rect2i(-19, -19, 38, 38)
+	grid.region = Rect2i(-29, -29, 58, 58)
 	grid.cell_size = Vector2(2, 2)
 	grid.offset = Vector2(1, 1)
 	grid.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	grid.update()
 	grid.fill_solid_region(grid.region, false)
+	for x in range(-29, 29):
+		for y in range(-29, 29):
+			var cell = Vector2i(x, y)
+			if Terrain.blocked(grid.get_point_position(cell), 1.1):
+				grid.set_point_solid(cell, true)
 	for b in buildings.values():
 		var radius: float = definitions[b.kind].radius + 0.8
-		for x in range(-19, 19):
-			for y in range(-19, 19):
+		for x in range(-29, 29):
+			for y in range(-29, 29):
 				var cell = Vector2i(x, y)
 				if grid.get_point_position(cell).distance_to(b.p) < radius:
 					grid.set_point_solid(cell, true)
 
 func _cell(pos: Vector2) -> Vector2i:
-	var candidate = Vector2i(floori(pos.x / 2), floori(pos.y / 2)).clamp(Vector2i(-19, -19), Vector2i(18, 18))
+	var candidate = Vector2i(floori(pos.x / 2), floori(pos.y / 2)).clamp(Vector2i(-29, -29), Vector2i(28, 28))
 	if not grid.is_point_solid(candidate):
 		return candidate
 	var best = candidate

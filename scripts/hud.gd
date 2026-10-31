@@ -48,6 +48,9 @@ var boss_panel: Panel
 var boss_label: Label
 var boss_bar: ProgressBar
 var rematch_button: Button
+var bonus_panel: Panel
+var bonus_title: Label
+var bonus_summary: Label
 var paused_by_help = false
 
 func setup(controller) -> void:
@@ -79,6 +82,7 @@ func setup(controller) -> void:
 	_make_lobby()
 	_make_help()
 	_make_outcome()
+	_make_bonus()
 	audio_button = _button(root, "音 [M]", Rect2(908, 14, 80, 35), func(): game.sound.toggle())
 	Session.changed.connect(refresh_mode)
 	Session.message.connect(toast)
@@ -177,7 +181,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.0.0     —     夜明けへの進軍", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.1.0     —     峡谷と実り", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -185,7 +189,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.0.0", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.1.0", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -269,13 +273,13 @@ func _make_lobby() -> void:
 	lobby_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	start_button = _button(lobby, "全員で出陣", Rect2(28, 240, 270, 43), func(): Session.start(), true)
 	_button(lobby, "タイトルへ", Rect2(311, 240, 137, 43), func(): Session.back_to_menu())
-	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.0.0", Vector2(28, 298), 11, MUTED)
+	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.1.0", Vector2(28, 298), 11, MUTED)
 
 func _make_help() -> void:
 	help_panel = _panel(root, Rect2(230, 87, 692, 535), Color(0.05, 0.12, 0.10, 0.99))
 	_label(help_panel, "指 揮 官 の 手 引 き", Vector2(28, 23), 24, GOLD)
 	_label(help_panel, "左クリック / ドラッグ     自分の部隊を選択（Shiftで追加）\nダブルクリック                画面内の同じ兵種をまとめて選択\n右クリック                        移動 / 敵を攻撃 / 村人で資源を採集\nWASD / 矢印 / 中ボタン     カメラ移動\nホイール / Space              拡大縮小 / 中央砦へ戻る\n1 / 2 / 3 / C                         村人 / 剣士 / 弓兵を予約 / 予約取消\nB / N / T                              家 / 兵舎 / 監視塔を設置\nE / X / Y                               進軍攻撃 / 停止 / 新兵の集合地点\nF / V / Z                               全兵士 / 全村人 / 待機村人\nU / L / R                               武器強化 / 建物強化 / 砦の修復\nCtrl+6〜9 → 6〜9                部隊グループ登録 → 呼び出し\nP / F9 / M                            一時停止 / セーブ（ソロ） / 消音", Vector2(29, 80), 13)
-	_label(help_panel, "最初はVで村人を選び、木や果実を右クリック。\n6波目の敵と指揮官を倒せば勝利。中央砦が壊れると全員敗北。\nソロはこの画面で一時停止。オンライン中は時間が進みます。", Vector2(29, 397), 12, MUTED)
+	_label(help_panel, "最初はVで村人を選び、木・畑・金鉱を右クリック。\n6波目の敵と指揮官を倒せば勝利。中央砦が壊れると全員敗北。\nソロはこの画面で一時停止。オンライン中は時間が進みます。", Vector2(29, 397), 12, MUTED)
 	_button(help_panel, "戦場へ戻る", Rect2(29, 477, 307, 38), toggle_help, true)
 	_button(help_panel, "タイトルへ戻る（退出）", Rect2(350, 477, 313, 38), func(): help_panel.hide(); paused_by_help = false; Session.back_to_menu())
 	help_panel.hide()
@@ -332,6 +336,12 @@ func _process(delta: float) -> void:
 	if game == null:
 		return
 	var sim = Session.sim
+	var player: Dictionary = sim.players.get(Session.local_id, {})
+	var points = player.get("skill_points", 0)
+	bonus_panel.visible = sim.running and points > 0 and Session.mode in ["solo", "host", "client"] and not help_panel.visible
+	bonus_title.text = "撃退ボーナス — スキルを1つ選択（残り%d）" % points
+	var skills: Dictionary = player.get("skills", {})
+	bonus_summary.text = "取得済み：豊穣 %d / 勇士 %d / 不屈 %d" % [skills.get("harvest", 0), skills.get("power", 0), skills.get("vitality", 0)] + ("　・ソロは選択まで待機" if Session.mode == "solo" else "　・オンライン中は時間が進みます")
 	audio_button.text = "消音 [M]" if game.sound.muted else "音 [M]"
 	if sim.result != "" and not outcome.visible:
 		refresh_mode()
@@ -395,3 +405,16 @@ func _process(delta: float) -> void:
 		toast(sim.event_text)
 	toast_left = maxf(0.0, toast_left - delta)
 	toast_label.modulate.a = minf(1, toast_left)
+
+func _make_bonus() -> void:
+	bonus_panel = _panel(root, Rect2(176, 188, 800, 245), Color(0.045, 0.10, 0.085, 0.99))
+	bonus_title = _label(bonus_panel, "撃退ボーナス — スキルを1つ選択", Vector2(24, 18), 23, GOLD)
+	_label(bonus_panel, "自分の部隊に適用。重ねて取得でき、次のウェーブにも持ち越します。", Vector2(24, 58), 13, MUTED)
+	var index = 0
+	for key in Sim.SKILLS:
+		var skill_key = key
+		var card = _button(bonus_panel, Sim.SKILLS[key].name + "\n" + Sim.SKILLS[key].detail, Rect2(24 + index * 253, 96, 243, 80), func(): Session.issue("skill", [], Vector2.ZERO, skill_key), true)
+		card.add_theme_font_size_override("font_size", 13)
+		index += 1
+	bonus_summary = _label(bonus_panel, "", Vector2(24, 197), 13, MUTED)
+	bonus_panel.hide()

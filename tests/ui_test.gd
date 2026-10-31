@@ -98,6 +98,14 @@ func run() -> void:
 	check(game.rally_mode, "Y enables rally placement")
 	await key(KEY_ESCAPE)
 	check(not game.rally_mode and not game.hud.help_panel.visible, "Escape cancels rally placement")
+	session.sim.players[1].skill_points = 1
+	await process_frame
+	await process_frame
+	check(game.hud.bonus_panel.visible, "wave reward shows three skill cards")
+	await click(Vector2(320, 315))
+	await process_frame
+	check(session.sim.players[1].skills.harvest == 1 and session.sim.players[1].skill_points == 0, "card click spends own reward")
+	check(not game.hud.bonus_panel.visible, "bonus closes after choice")
 	print("UI_TEST ", checks - failures.size(), "/", checks, " PASS; failures=", failures)
 	game.queue_free()
 	await process_frame

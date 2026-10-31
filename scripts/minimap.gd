@@ -10,11 +10,11 @@ func _ready() -> void:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		navigated.emit((event.position / size - Vector2.ONE * 0.5) * 80.0)
+		navigated.emit((event.position / size - Vector2.ONE * 0.5) * 120.0)
 		accept_event()
 
 func _point(pos: Vector2) -> Vector2:
-	return (pos / 80.0 + Vector2.ONE * 0.5) * size
+	return (pos / 120.0 + Vector2.ONE * 0.5) * size
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("283c33"))
@@ -23,10 +23,12 @@ func _draw() -> void:
 		draw_line(Vector2(0, size.y * i / 4), Vector2(size.x, size.y * i / 4), Color("34473b"))
 	if sim == null:
 		return
+	for cliff in sim.Terrain.CLIFFS:
+		draw_rect(Rect2(_point(cliff.position), cliff.size / 120.0 * size), Color("a2a096"))
 	for res in sim.resources.values():
 		if res.amount <= 0:
 			continue
-		var color = Color("6f8b55") if res.kind == "wood" else Color("d0b779") if res.kind == "gold" else Color("b47f57")
+		var color = Color("6f8b55") if res.kind == "wood" else Color("ffdc38") if res.kind == "gold" else Color("e7cc66")
 		draw_circle(_point(res.p), 1.5, color)
 	for b in sim.buildings.values():
 		draw_rect(Rect2(_point(b.p) - Vector2(3, 3), Vector2(6, 6)), Color("d8c89d"))

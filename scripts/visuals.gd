@@ -24,7 +24,7 @@ func box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInsta
 	mesh.size = size
 	return piece(parent, mesh, pos, color)
 
-func cylinder(parent: Node3D, bottom: float, top: float, height: float, pos: Vector3, color: Color, sides: int = 6) -> MeshInstance3D:
+func cylinder(parent: Node3D, bottom: float, top: float, height: float, pos: Vector3, color: Color, sides: int = 10) -> MeshInstance3D:
 	var mesh = CylinderMesh.new()
 	mesh.bottom_radius = bottom
 	mesh.top_radius = top
@@ -78,16 +78,37 @@ func make_unit(kind: String, team: Color) -> Node3D:
 	box(body, Vector3(0.28, 0.3, 0.27), Vector3(0, 1.26, 0), skin)
 	box(body, Vector3(0.12, 0.4, 0.14), Vector3(-0.29, 0.79, 0), cloth.darkened(0.16))
 	box(body, Vector3(0.12, 0.4, 0.14), Vector3(0.29, 0.79, 0), cloth.darkened(0.16))
+	# Layered silhouettes keep flat PS1 shading, with richer equipment geometry.
+	cylinder(body, 0.24, 0.20, 0.55, Vector3(0, 0.82, 0), cloth, 10)
+	box(body, Vector3(0.44, 0.07, 0.32), Vector3(0, 0.61, 0), Color("554333"))
+	for side in [-1, 1]:
+		box(body, Vector3(0.18, 0.16, 0.30), Vector3(side * 0.13, 0.10, -0.05), Color("473e32"))
 	if kind == "worker":
+		box(body, Vector3(0.32, 0.43, 0.04), Vector3(0, 0.78, -0.17), Color("bba376"))
+		cylinder(body, 0.42, 0.42, 0.055, Vector3(0, 1.43, 0), Color("e6c77a"), 12)
+		box(body, Vector3(0.28, 0.32, 0.24), Vector3(0, 0.78, 0.28), Color("8d7048"))
 		cylinder(body, 0.25, 0.14, 0.16, Vector3(0, 1.45, 0), Color("ccad6c"))
 		box(body, Vector3(0.06, 0.72, 0.06), Vector3(0.36, 0.95, 0.05), Color("69513b"))
 		box(body, Vector3(0.3, 0.16, 0.11), Vector3(0.43, 1.22, 0.05), Color("b3b4a3"))
 	elif kind in ["archer", "slinger"]:
 		cylinder(body, 0.21, 0, 0.28, Vector3(0, 1.51, 0), team.darkened(0.35))
+		box(body, Vector3(0.46, 0.58, 0.055), Vector3(0, 0.78, 0.21), Color("2c6243"))
+		for i in range(4):
+			var limb = cylinder(body, 0.045, 0.045, 0.32, Vector3(0.46 + sin(i * PI / 3) * 0.18, 0.55 + i * 0.26, -0.16), Color("d5ac70"), 8)
+			limb.rotation.z = [-0.6, -0.25, 0.25, 0.6][i]
+		box(body, Vector3(0.02, 1.12, 0.02), Vector3(0.46, 0.96, -0.16), Color("eee0b4"))
+		for i in range(3):
+			cylinder(body, 0.018, 0.018, 0.6, Vector3(-0.17 + i * 0.06, 1.2, 0.28), Color("e8d7ac"), 6)
 		var bow = cylinder(body, 0.025, 0.025, 0.95, Vector3(0.35, 0.95, -0.13), Color("b7a076"), 4)
 		bow.rotation.z = -0.25
 		box(body, Vector3(0.08, 0.65, 0.13), Vector3(-0.12, 0.9, 0.24), Color("574633"))
 	else:
+		box(body, Vector3(0.48, 0.43, 0.35), Vector3(0, 0.86, 0), Color("8e9fa4"))
+		for side in [-1, 1]:
+			cylinder(body, 0.19, 0.15, 0.16, Vector3(side * 0.29, 1.02, 0), Color("aebfc2"), 8)
+		box(body, Vector3(0.085, 0.28, 0.30), Vector3(0, 1.61, 0), cloth.lightened(0.15))
+		box(body, Vector3(0.075, 0.7, 0.62), Vector3(-0.39, 0.88, 0), Color("d9dfd4"))
+		box(body, Vector3(0.085, 0.54, 0.45), Vector3(-0.40, 0.88, 0), cloth)
 		cylinder(body, 0.23, 0.17, 0.22, Vector3(0, 1.43, 0), Color("929c97"), 5)
 		box(body, Vector3(0.12, 0.8, 0.07), Vector3(0.37, 1.05, 0), Color("bbc8bf"))
 		box(body, Vector3(0.3, 0.07, 0.09), Vector3(0.37, 0.82, 0), Color("897753"))
@@ -148,6 +169,12 @@ func make_building(kind: String, team: Color) -> Node3D:
 			for z in [-0.84, 0.84]:
 				box(root, Vector3(0.36, 0.65, 0.36), Vector3(x, 4.38, z), stone)
 		flag(root, Vector3(0, 4.0, 0), team, 1.65)
+	for x in [-0.8, 0.8]:
+		if kind in ["hall", "house", "barracks"]:
+			box(root, Vector3(0.10, 1.1, 0.12), Vector3(x, 0.8, 1.26 if kind == "house" else 1.8), timber)
+	if kind == "tower":
+		for height in [0.9, 1.8, 2.7]:
+			box(root, Vector3(1.76, 0.10, 1.76), Vector3(0, height, 0), stone.lightened(0.12))
 	return root
 
 func make_resource(kind: String, seed_value: int) -> Node3D:
@@ -162,17 +189,27 @@ func make_resource(kind: String, seed_value: int) -> Node3D:
 		cylinder(root, 1.1, 0, height * 0.75, Vector3(0, height * 0.59, 0), color, 5)
 		cylinder(root, 0.8, 0, height * 0.65, Vector3(0, height * 0.84, 0), color.lightened(0.04), 5)
 	elif kind == "food":
-		for i in range(3):
-			var pos = Vector3(random.randf_range(-0.4, 0.4), 0.35, random.randf_range(-0.4, 0.4))
-			cylinder(root, 0.48, 0.25, 0.75, pos, Color("666941"), 5)
-			box(root, Vector3(0.12, 0.12, 0.12), pos + Vector3(0.1, 0.42, 0.13), Color("ce8460"))
+		box(root, Vector3(2.7, 0.12, 2.6), Vector3(0, 0.03, 0), Color("62442c"))
+		for row in range(5):
+			box(root, Vector3(0.20, 0.12, 2.4), Vector3(-1.0 + row * 0.5, 0.12, 0), Color("987143"))
+			for col in range(5):
+				var pos = Vector3(-1.0 + row * 0.5, 0.50, -1.0 + col * 0.5)
+				cylinder(root, 0.025, 0.02, 0.70, pos, Color("c8ac4a"), 5)
+				cylinder(root, 0.105, 0.035, 0.29, pos + Vector3(0, 0.40, 0), Color("f4d476"), 6)
+		for x in [-1.4, 1.4]:
+			box(root, Vector3(0.09, 0.25, 2.8), Vector3(x, 0.15, 0), Color("b6a477"))
 	else:
-		for i in range(3):
-			var pos = Vector3(random.randf_range(-0.45, 0.45), 0.38, random.randf_range(-0.45, 0.45))
-			var rock = cylinder(root, 0.58, 0.32, 0.8, pos, Color("858574"), 5)
+		cylinder(root, 1.35, 1.1, 0.15, Vector3(0, 0.06, 0), Color("625d55"), 10)
+		for i in range(5):
+			var angle = i * TAU / 5
+			var pos = Vector3(cos(angle) * 0.65, 0.48, sin(angle) * 0.65)
+			var rock = cylinder(root, 0.65, 0.33, 1.05, pos, Color("626d77"), 9)
 			rock.rotation.z = random.randf_range(-0.3, 0.3)
-			box(root, Vector3(0.28, 0.17, 0.3), pos + Vector3(0, 0.44, 0), Color("d3b776"))
-	root.rotation.y = random.randf_range(-PI, PI)
+			var ore = cylinder(root, 0.27, 0.12, 0.55, pos + Vector3(0, 0.55, 0), Color("ffcf3d"), 7)
+			ore.rotation.z = 0.35
+			box(root, Vector3(0.35, 0.18, 0.40), pos + Vector3(0.18, 0.20, -0.30), Color("f7b92a"))
+
+	root.rotation.y = random.randf_range(-PI, PI) if kind == "wood" else 0.0
 	return root
 
 func terrain() -> Node3D:
@@ -182,14 +219,14 @@ func terrain() -> Node3D:
 	var surface = SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var greens = [Color("53664b"), Color("5d7050"), Color("617152"), Color("596b4c"), Color("667655")]
-	for x in range(-44, 44, 2):
-		for z in range(-44, 44, 2):
+	for x in range(-64, 64, 2):
+		for z in range(-64, 64, 2):
 			var pos = Vector2(x, z)
 			var path = absf(float(x) - float(z) * 0.3) < 2.3 or absf(float(z) + float(x) * 0.22) < 2.0
 			var color: Color = greens[random.randi_range(0, 4)]
 			if path or pos.length() < 5:
 				color = Color("8e8765").darkened(random.randf_range(0, 0.12))
-			if abs(x) > 38 or abs(z) > 38:
+			if abs(x) > 58 or abs(z) > 58:
 				color = color.darkened(0.2)
 			for point in [Vector3(x, -0.04, z), Vector3(x + 2, -0.04, z), Vector3(x, -0.04, z + 2),
 				Vector3(x + 2, -0.04, z), Vector3(x + 2, -0.04, z + 2), Vector3(x, -0.04, z + 2)]:
@@ -202,15 +239,24 @@ func terrain() -> Node3D:
 	material.vertex_color_use_as_albedo = true
 	ground.material_override = material
 	root.add_child(ground)
+	var terrain_data = preload("res://scripts/terrain_data.gd")
+	for cliff in terrain_data.CLIFFS:
+		# The continuous core matches collision exactly; ledges add detail outside it.
+		box(root, Vector3(cliff.size.x, 2.6, cliff.size.y), Vector3(cliff.get_center().x, 1.25, cliff.get_center().y), Color("777c75"))
+		for x in range(int(cliff.position.x), int(cliff.end.x), 2):
+			for z in range(int(cliff.position.y), int(cliff.end.y), 2):
+				var height = random.randf_range(2.7, 3.8)
+				cylinder(root, 1.42, 1.10, height, Vector3(x + 1, height / 2, z + 1), Color("8b9080"), 9)
+		box(root, Vector3(cliff.size.x - 0.4, 0.12, cliff.size.y - 0.4), Vector3(cliff.get_center().x, 2.64, cliff.get_center().y), Color("718058"))
 	# Impassable-looking wilderness sits beyond the actual playable boundary.
 	for i in range(88):
 		var angle = random.randf_range(0, TAU)
-		var pos = Vector2(cos(angle), sin(angle)) * random.randf_range(43, 55)
+		var pos = Vector2(cos(angle), sin(angle)) * random.randf_range(68, 78)
 		var rock = cylinder(root, random.randf_range(3, 7), random.randf_range(0.6, 2), random.randf_range(4, 9),
 			Vector3(pos.x, 1.0, pos.y), Color("4c5b51"), 5)
 		rock.rotation.y = angle
 	for i in range(140):
-		var pos = Vector3(random.randf_range(-38, 38), 0.12, random.randf_range(-38, 38))
+		var pos = Vector3(random.randf_range(-58, 58), 0.12, random.randf_range(-58, 58))
 		if Vector2(pos.x, pos.z).length() < 7:
 			continue
 		var tuft = cylinder(root, 0.14, 0, random.randf_range(0.25, 0.6), pos, Color("8b8b60"), 3)

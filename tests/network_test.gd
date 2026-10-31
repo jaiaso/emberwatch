@@ -50,6 +50,8 @@ func _process(delta: float) -> bool:
 				for id in session.sim.players:
 					if id != 1 and not client_baseline.has(id) and u.owner == id:
 						client_baseline[id] = u.p
+			for player in session.sim.players.values():
+				player.skill_points = 1
 			session.start()
 			# Exercise multi-packet snapshots with a full late-game enemy wave.
 			session.sim.wave = 5
@@ -60,7 +62,11 @@ func _process(delta: float) -> bool:
 			for u in session.sim.units.values():
 				if u.owner != 1 and u.order == "move" and not owners.has(u.owner):
 					owners.append(u.owner)
-			var passed = owners.size() == 3 and session.sim.units[host_unit].target == host_target and session.sim.tick > 60
+			var skilled = 0
+			for id in session.sim.players:
+				if id != 1 and session.sim.players[id].skills.power == 1 and session.sim.players[id].skill_points == 0:
+					skilled += 1
+			var passed = skilled == 3 and owners.size() == 3 and session.sim.units[host_unit].target == host_target and session.sim.tick > 60
 			print("NETWORK_HOST four_peers=", session.sim.players.size(), " authorized_clients=", owners.size(), " ownership_protected=", session.sim.units[host_unit].target == host_target, " enemies=", session.sim.enemies_left(), " tick=", session.sim.tick, " PASS=", passed)
 			quit(0 if passed else 1)
 	else:
@@ -77,9 +83,10 @@ func _process(delta: float) -> bool:
 			# The server must reject this forged attempt to control the host's unit.
 			session.issue("move", [host_unit], Vector2(-29, 25))
 			session.issue("move", [own], Vector2(25, 20))
+			session.issue("skill", [], Vector2.ZERO, "power")
 			sent = true
 		if sent and clock > 7.0:
-			var passed = session.sim.tick > 50 and session.sim.units[own].order == "move" and session.sim.units[host_unit].target == host_target and session.sim.units[own].p.distance_to(Vector2(25, 20)) < 30.0
+			var passed = session.sim.players[session.local_id].skills.power == 1 and session.sim.players[session.local_id].skill_points == 0 and session.sim.tick > 50 and session.sim.units[own].order == "move" and session.sim.units[host_unit].target == host_target and session.sim.units[own].p.distance_to(Vector2(25, 20)) < 30.0
 			print("NETWORK_CLIENT ", role, " peer=", session.local_id, " tick=", session.sim.tick, " own_order=", session.sim.units[own].order, " PASS=", passed)
 			# Remain connected until the host has checked all three owners.
 			if not passed:

@@ -14,6 +14,8 @@ func run() -> void:
 	var site_index = 0
 	for tick in range(18000):
 		if tick % 10 == 0:
+			if sim.players[1].skill_points > 0:
+				sim.command(1, "skill", [], Vector2.ZERO, "power")
 			var workers: Array = []
 			for u in sim.units.values():
 				if u.owner == 1 and u.kind == "worker":
@@ -28,6 +30,15 @@ func run() -> void:
 								nearest = res.id
 						if nearest != -1:
 							sim.command(1, "gather", [u.id], sim.resources[nearest].p, str(nearest))
+			var army: Array = []
+			var target = Vector2.ZERO
+			for u in sim.units.values():
+				if u.owner == 1 and u.kind != "worker":
+					army.append(u.id)
+				elif u.owner == 0:
+					target = u.p
+			if sim.enemies_left() > 0:
+				sim.command(1, "attack_move", army, target)
 			if workers.size() + sim.buildings[1].queue.size() < 8:
 				sim.command(1, "train", [], Vector2.ZERO, "worker")
 			sim.command(1, "train", [], Vector2.ZERO, "archer" if tick % 30 == 0 else "soldier")

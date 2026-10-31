@@ -30,7 +30,7 @@ func run() -> void:
 	print("FONT_AXES ", font.get_supported_variation_list())
 	var sim = fresh()
 	check(sim.units.size() == 6 and sim.population() == 6, "initial army")
-	check(sim.buildings.has(1) and sim.resources.size() == 66, "deterministic settlement")
+	check(sim.buildings.has(1) and sim.resources.size() > 120, "deterministic settlement")
 	var worker = -1
 	for u in sim.units.values():
 		if u.kind == "worker":
@@ -147,6 +147,7 @@ func run() -> void:
 	sim.difficulty = 0
 	var easy_enemy: int = sim.spawn_unit("raider", Vector2(20, 20), 0)
 	check(sim.units[easy_enemy].max_hp < 85, "easy difficulty reduces enemy health")
+	sim.units.erase(easy_enemy)
 	sim.wave = 5
 	sim.next_wave = 0
 	sim.step(0.05)

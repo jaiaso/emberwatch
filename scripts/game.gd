@@ -70,6 +70,27 @@ func _ready() -> void:
 			Session.solo()
 		if args[i] == "--showcase":
 			_showcase()
+	if "--landscape" in args:
+		Session.solo()
+		Session.allow_autosave = false
+		Session.sim.elapsed = 151
+		Session.sim.next_wave = 221
+		camera_center = Vector2(-11, -5)
+		zoom = 46
+	if "--units-preview" in args:
+		Session.solo()
+		Session.allow_autosave = false
+		Session.sim.elapsed = 151
+		Session.sim.next_wave = 221
+		Session.sim.units.clear()
+		for i in range(3):
+			Session.sim.spawn_unit(["worker", "soldier", "archer"][i], Vector2(-8 + i * 3, 8), 1)
+		camera_center = Vector2(-5, 8)
+		zoom = 17
+	if "--bonus-preview" in args:
+		Session.solo()
+		Session.allow_autosave = false
+		Session.sim.players[1].skill_points = 1
 	_update_camera()
 
 func _setup_world() -> void:
@@ -154,7 +175,7 @@ func _process(delta: float) -> void:
 			var horizontal = float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT)) - float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT))
 			var vertical = float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN)) - float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP))
 			camera_center += (Vector2(0.768, -0.64) * horizontal + Vector2(0.64, 0.768) * vertical) * zoom * 0.6 * delta
-			camera_center = camera_center.clamp(Vector2(-32, -32), Vector2(32, 32))
+			camera_center = camera_center.clamp(Vector2(-52, -52), Vector2(52, 52))
 	_update_camera()
 	_sync_models(delta)
 	for event in Session.sim.events:
@@ -475,7 +496,18 @@ func _draw_overlay() -> void:
 	if rally_screen.y > 64 and rally_screen.y < 500:
 		overlay.draw_line(rally_screen, rally_screen + Vector2(0, -22), Color("e5ba74"), 1)
 		overlay.draw_colored_polygon(PackedVector2Array([rally_screen + Vector2(0, -22), rally_screen + Vector2(12, -18), rally_screen + Vector2(0, -14)]), Color("e5ba74"))
+	for res in Session.sim.resources.values():
+		if res.amount <= 0 or res.kind == "wood":
+			continue
+		var rp = camera.unproject_position(Vector3(res.p.x, 2.4, res.p.y))
+		if Rect2(0, 145, 1152, 350).has_point(rp):
+			overlay.draw_style_box(hud._style(Color("142a24"), Color("b5a765")), Rect2(rp - Vector2(17, 14), Vector2(42, 19)))
+			overlay.draw_string(hud.root.get_theme_default_font(), rp + Vector2(-12, 0), "畑" if res.kind == "food" else "金鉱", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("ffe092"))
 	for u in Session.sim.units.values():
+		if u.owner != 0:
+			var marker = camera.unproject_position(Vector3(u.p.x, 2.2, u.p.y))
+			if Rect2(0, 145, 1152, 350).has_point(marker):
+				overlay.draw_string(hud.root.get_theme_default_font(), marker + Vector2(-5, -3), {"worker": "農", "soldier": "剣", "archer": "弓"}.get(u.kind, ""), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, {"worker": Color("ffe092"), "soldier": Color("e7f2ff"), "archer": Color("a2edb1")}.get(u.kind, Color.WHITE))
 		if u.id not in selected and u.hp >= u.max_hp:
 			continue
 		var pos = camera.unproject_position(Vector3(u.p.x, 1.9 if u.kind != "brute" else 2.7, u.p.y))

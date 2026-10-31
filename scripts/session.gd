@@ -7,8 +7,8 @@ signal pinged(pos: Vector2)
 
 const Simulation = preload("res://scripts/simulation.gd")
 const PORT = 27840
-const VERSION = "1.0.0"
-const SAVE_PATH = "user://emberwatch-v1.save"
+const VERSION = "1.1.0"
+const SAVE_PATH = "user://emberwatch-v11.save"
 const SAVE_MAGIC = "EMBERWATCH_SAVE_1"
 var sim = Simulation.new()
 var mode = "menu"

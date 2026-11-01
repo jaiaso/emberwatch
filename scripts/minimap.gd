@@ -35,6 +35,20 @@ func _draw() -> void:
 	for u in sim.units.values():
 		var color = Color("df765e") if u.owner == 0 else Color("94cfb6")
 		draw_circle(_point(u.p), 1.5 if u.owner else 2.0, color)
+	var incoming: Dictionary = sim.incoming_attack()
+	if not incoming.is_empty():
+		var source = _point(incoming.origin)
+		var heading = (_point(Vector2.ZERO) - source).normalized()
+		var tip = source + heading * 16.0
+		var wing = heading.orthogonal() * 4.5
+		var pulse = 0.65 + 0.35 * sin(Time.get_ticks_msec() / 260.0)
+		var warning = Color(1.0, 0.71, 0.28, pulse)
+		draw_circle(source, 7.0, Color(0.07, 0.10, 0.08, 0.95))
+		draw_arc(source, 7.0, 0, TAU, 28, warning, 2.0)
+		draw_line(source, tip, warning, 2.5)
+		draw_colored_polygon(PackedVector2Array([tip, tip - heading * 7 + wing, tip - heading * 7 - wing]), warning)
+		var label_pos = (source + Vector2(9, -8)).clamp(Vector2(2, 13), size - Vector2(36, 3))
+		draw_string(get_theme_default_font(), label_pos, incoming.direction, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("ffe0a0"))
 	var center = _point(camera_center)
 	var points = PackedVector2Array([center + Vector2(0, -21), center + Vector2(31, 0), center + Vector2(0, 21), center + Vector2(-31, 0), center + Vector2(0, -21)])
 	draw_polyline(points, Color("e8d6a6"), 1.0)

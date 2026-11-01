@@ -55,6 +55,25 @@ func run() -> void:
 	if session.mode != "solo":
 		quit(1)
 		return
+	await process_frame
+	await process_frame
+	check(game.hud.incoming_panel.visible and "北西" in game.hud.incoming_label.text, "initial preparation previews northwest")
+	var enemy = session.sim.spawn_unit("raider", Vector2(-50, -45), 0)
+	await process_frame
+	await process_frame
+	check(not game.hud.incoming_panel.visible, "active battle hides preparation preview")
+	session.sim.units.erase(enemy)
+	session.sim.wave = 1
+	await process_frame
+	await process_frame
+	check(game.hud.incoming_panel.visible and "北東" in game.hud.incoming_label.text, "next preparation previews next wave")
+	session.sim.wave = 6
+	await process_frame
+	await process_frame
+	check(not game.hud.incoming_panel.visible, "no preview after final wave")
+	session.solo()
+	await process_frame
+	await process_frame
 	await key(KEY_V)
 	check(game.selected.size() == 3, "V selects all three own workers")
 	await key(KEY_B)

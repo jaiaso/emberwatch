@@ -5,6 +5,8 @@ const Terrain = preload("res://scripts/terrain_data.gd")
 const MAP_HALF = Terrain.HALF
 const WAVE_COUNT = 6
 const WAVE_INTERVAL = 70.0
+const WAVE_DIRECTIONS = ["北西", "北東", "南東", "南西"]
+const WAVE_ORIGINS = [Vector2(-50, -45), Vector2(49, -44), Vector2(47, 49), Vector2(-48, 46)]
 const Navigation = preload("res://scripts/navigation.gd")
 const DIFFICULTIES = ["穏やかな夜", "標準の夜", "苛烈な夜"]
 const TRAIN_TIME = {"worker": 3.0, "soldier": 4.0, "archer": 5.0}
@@ -446,11 +448,22 @@ func step(delta: float) -> void:
 		running = false
 		announce("夜明けだ。砦は守られた。")
 
+func approach_for_wave(number: int) -> Dictionary:
+	if number < 1 or number > WAVE_COUNT:
+		return {}
+	var side = (number - 1) % WAVE_DIRECTIONS.size()
+	return {"wave": number, "direction": WAVE_DIRECTIONS[side], "origin": WAVE_ORIGINS[side]}
+
+func incoming_attack() -> Dictionary:
+	if not running or result != "" or enemies_left() > 0:
+		return {}
+	return approach_for_wave(wave + 1)
+
 func _spawn_wave() -> void:
 	wave += 1
 	next_wave = elapsed + [85.0, WAVE_INTERVAL, 60.0][difficulty]
-	var side = (wave - 1) % 4
-	var origin: Vector2 = [Vector2(-50, -45), Vector2(49, -44), Vector2(47, 49), Vector2(-48, 46)][side]
+	var approach = approach_for_wave(wave)
+	var origin: Vector2 = approach.origin
 	var count = (5 + wave * 3) * maxi(1, players.size())
 	count = mini(int(ceil(count * [0.75, 1.0, 1.15][difficulty])), 100)
 	for i in range(count):
@@ -462,7 +475,7 @@ func _spawn_wave() -> void:
 		var boss = spawn_unit("warlord", origin + Vector2(0, 3), 0)
 		units[boss].hp *= 1.0 + 0.45 * (players.size() - 1)
 		units[boss].max_hp = units[boss].hp
-	announce("第 %d 波 ／ %sから敵襲！" % [wave, ["北西", "北東", "南東", "南西"][side]])
+	announce("第 %d 波 ／ %sから敵襲！" % [wave, approach.direction])
 
 func _nearest_enemy(pos: Vector2, radius: float, hostile: bool) -> int:
 	var nearest = -1

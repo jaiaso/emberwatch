@@ -20,6 +20,8 @@ var address: LineEdit
 var resources_label: Label
 var wave_label: Label
 var time_label: Label
+var incoming_panel: Panel
+var incoming_label: Label
 var selection_label: Label
 var task_label: Label
 var hp_label: Label
@@ -182,7 +184,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.2.0     —     光と鋼", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.2.1     —     光と鋼", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -190,7 +192,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.2.0", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.2.1", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -201,6 +203,10 @@ func _make_play_ui() -> void:
 	wave_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	wave_label = _label(play_ui, "", Vector2(896, 85), 17, GOLD)
 	time_label = _label(play_ui, "", Vector2(896, 113), 11, MUTED)
+	incoming_panel = _panel(play_ui, Rect2(882, 150, 246, 36), Color(0.10, 0.13, 0.10, 0.94))
+	incoming_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	incoming_label = _label(incoming_panel, "", Vector2(13, 6), 16, GOLD)
+	incoming_panel.hide()
 	tutorial_panel = _panel(play_ui, Rect2(13, 153, 302, 99), Color(0.05, 0.12, 0.10, 0.84))
 	tutorial_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	tutorial = _label(tutorial_panel, "", Vector2(11, 9), 12, CREAM)
@@ -347,6 +353,10 @@ func _process(delta: float) -> void:
 	if sim.result != "" and not outcome.visible:
 		refresh_mode()
 	resources_label.text = "食料 %d    木 %d    金 %d    人口 %d+%d/%d" % [sim.stock.food, sim.stock.wood, sim.stock.gold, sim.population(), sim.queued_population(), sim.capacity()]
+	var incoming: Dictionary = sim.incoming_attack()
+	incoming_panel.visible = not incoming.is_empty()
+	if not incoming.is_empty():
+		incoming_label.text = "準備：第%d波・%sから" % [incoming.wave, incoming.direction]
 	wave_label.text = "襲撃  %02d / 06" % sim.wave
 	var remain = int(maxf(0, sim.next_wave - sim.elapsed))
 	time_label.text = "敵 %d  ·  次まで %02d:%02d" % [sim.enemies_left(), remain / 60, remain % 60] if sim.wave < 6 else "敵残り %d  ·  最後の夜" % sim.enemies_left()

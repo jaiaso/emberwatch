@@ -10,7 +10,10 @@ const WAVE_DIRECTIONS = ["北西", "北東", "南東", "南西"]
 const WAVE_ORIGINS = [Vector2(-50, -45), Vector2(49, -44), Vector2(47, 49), Vector2(-48, 46)]
 const Navigation = preload("res://scripts/navigation.gd")
 const DIFFICULTIES = ["穏やかな夜", "標準の夜", "苛烈な夜"]
-const TRAIN_TIME = {"worker": 5.0, "soldier": 18.0, "archer": 22.0}
+const TRAIN_TIME = {"worker": 5.0, "soldier": 18.0, "archer": 22.0, "cavalry": 30.0}
+const HEAL_RADIUS = 8.0
+const HEAL_RATE = 4.0
+const HEAL_DELAY = 5.0
 const RESEARCH = {
 	"weapons": {"name": "鋼の武器", "cost": {"food": 120, "gold": 100}},
 	"masonry": {"name": "石造の砦", "cost": {"wood": 180, "gold": 100}},
@@ -22,8 +25,9 @@ const SKILLS = {
 }
 const UNIT_DATA = {
 	"worker": {"hp": 55.0, "speed": 3.0, "range": 1.4, "damage": 4.0, "cost": {"food": 45}},
-	"soldier": {"hp": 125.0, "speed": 2.8, "range": 1.6, "damage": 18.0, "cost": {"food": 55, "gold": 20}},
-	"archer": {"hp": 65.0, "speed": 3.1, "range": 8.0, "damage": 12.0, "cost": {"wood": 45, "gold": 25}},
+	"soldier": {"hp": 175.0, "speed": 2.8, "range": 1.6, "damage": 10.0, "armor": 0.45, "cost": {"food": 55, "gold": 20}},
+	"archer": {"hp": 65.0, "speed": 2.5, "range": 8.0, "damage": 15.0, "armor": 0.05, "cost": {"wood": 45, "gold": 25}},
+	"cavalry": {"hp": 150.0, "speed": 4.5, "range": 1.9, "damage": 17.0, "armor": 0.22, "cost": {"food": 110, "gold": 70}},
 	"raider": {"hp": 85.0, "speed": 2.3, "range": 1.7, "damage": 10.0, "cost": {}},
 	"brute": {"hp": 270.0, "speed": 1.6, "range": 2.2, "damage": 23.0, "cost": {}},
 	"slinger": {"hp": 60.0, "speed": 2.1, "range": 6.0, "damage": 9.0, "cost": {}},
@@ -199,7 +203,7 @@ func spawn_unit(kind: String, pos: Vector2, owner: int) -> int:
 		hp *= 1.0 + 0.2 * players.get(owner, {}).get("skills", {}).get("vitality", 0)
 	units[id] = {"id": id, "kind": kind, "owner": owner, "p": pos, "hp": hp,
 		"max_hp": hp, "target": pos, "order": "idle", "resource": -1,
-		"enemy": -1, "cool": 0.0, "gather": 0.0, "anim": 0.0, "attack_at": -10.0}
+		"enemy": -1, "cool": 0.0, "gather": 0.0, "anim": 0.0, "attack_at": -10.0, "last_hit_at": -10.0, "healing": false}
 	return id
 
 func _spawn_building(kind: String, pos: Vector2, owner: int, complete: bool) -> int:
@@ -324,7 +328,7 @@ func command(sender: int, action: String, ids: Array, pos: Vector2, extra: Strin
 				units[id].resource = build_id
 				units[id].enemy = -1
 		"train":
-			if extra not in ["worker", "soldier", "archer"]:
+			if extra not in ["worker", "soldier", "archer", "cavalry"]:
 				return "無効な兵種です。"
 			if population() + queued_population() >= capacity():
 				return "人口上限です。家を建ててください。"
@@ -439,7 +443,7 @@ func step(delta: float) -> void:
 			var victim = _nearest_enemy(b.p, 11.0, true)
 			if victim != -1:
 				var damage = 27.0 * (1.25 if upgrades.weapons else 1.0)
-				units[victim].hp -= damage
+				damage = deal_damage(units[victim],damage)
 				effect("arrow", b.p, units[victim].p, false, damage)
 				b.cool = 1.1
 	var unit_ids = units.keys()
@@ -454,6 +458,7 @@ func step(delta: float) -> void:
 		if u.owner == 0:
 			_step_enemy(u, delta)
 		else:
+			_heal_near_hall(u,delta)
 			_step_ally(u, delta)
 	for id in unit_ids:
 		if units.has(id) and units[id].hp <= 0:
@@ -546,10 +551,29 @@ func _strike(u: Dictionary, target: Dictionary, delta: float, building: bool = f
 		var damage = float(UNIT_DATA[u.kind].damage) * (1.25 if u.owner != 0 and upgrades.weapons else 1.0)
 		damage *= 1.0 + 0.15 * players.get(u.owner, {}).get("skills", {}).get("power", 0)
 		damage *= u.get("wave_power",1.0)
-		target.hp -= damage
+		damage = deal_damage(target,damage)
 		u.attack_at = elapsed
 		effect("arrow" if u.kind in ["archer", "slinger"] else "hit", u.p, target.p, u.owner == 0, damage)
 		u.cool = 0.85 if u.kind != "brute" else 1.4
+
+func deal_damage(target: Dictionary, amount: float) -> float:
+	var armor = float(UNIT_DATA.get(target.kind,{}).get("armor",0.0))
+	var damage = maxf(0.0,amount) * (1.0 - clampf(armor,0.0,0.85))
+	var dealt = minf(maxf(0.0,target.hp),damage)
+	target.hp -= dealt
+	target.last_hit_at = elapsed
+	target.healing = false
+	return dealt
+
+func _heal_near_hall(u: Dictionary, delta: float) -> void:
+	u.healing = false
+	var hall: Dictionary = buildings.get(1,{})
+	if u.owner == 0 or u.hp <= 0 or u.hp >= u.max_hp or hall.is_empty() or hall.hp <= 0 or hall.progress < 1.0:
+		return
+	if u.p.distance_to(hall.p) > HEAL_RADIUS or elapsed - u.get("last_hit_at",-10.0) < HEAL_DELAY:
+		return
+	u.hp = minf(u.max_hp,u.hp + HEAL_RATE * delta)
+	u.healing = true
 
 func _step_enemy(u: Dictionary, delta: float) -> void:
 	if u.get("guard",false):

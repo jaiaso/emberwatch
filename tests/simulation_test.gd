@@ -172,7 +172,7 @@ func run() -> void:
 	var fighter: int = combat.spawn_unit("soldier", Vector2(15, 15), 1)
 	var victim: int = combat.spawn_unit("raider", Vector2(16, 15), 0)
 	combat.step(0.05)
-	check(is_equal_approx(combat.units[victim].hp, 62.5), "weapon upgrade increases actual damage by 25 percent")
+	check(is_equal_approx(combat.units[victim].hp, 72.5), "weapon upgrade increases actual damage by 25 percent")
 	var session = root.get_node("Session")
 	session.mode = "client"
 	session.sim.match_id = sim.match_id

@@ -38,7 +38,7 @@ func run() -> void:
 						sim.command(1,"gather",[u.id],nearest.p,str(nearest.id))
 			if workers.size()+sim.buildings[1].queue.size()<10:
 				sim.command(1,"train",[],Vector2.ZERO,"worker")
-			sim.command(1,"train",[],Vector2.ZERO,"archer" if tick%60==0 else "soldier")
+			sim.command(1,"train",[],Vector2.ZERO,["soldier","archer","cavalry","archer"][(tick/20)%4])
 			var houses=0
 			var towers=0
 			var barracks=0

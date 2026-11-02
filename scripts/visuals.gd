@@ -104,6 +104,8 @@ func flag(parent: Node3D, pos: Vector3, color: Color, height: float = 2.4) -> vo
 	cloth.material_override = material
 
 func make_unit(kind: String, team: Color) -> Node3D:
+	if kind == "cavalry":
+		return make_cavalry(team)
 	var root = Node3D.new()
 	var body = Node3D.new()
 	body.name = "Body"
@@ -437,3 +439,42 @@ func batch_static(root: Node3D) -> void:
 		mesh.mesh = group.surface.commit()
 		mesh.material_override = group.material
 		root.add_child(mesh)
+
+func make_cavalry(team: Color) -> Node3D:
+	var root = make_unit("soldier",team)
+	var rider: Node3D = root.get_node("Body")
+	rider.position.y = 0.90
+	rider.scale = Vector3.ONE*0.85
+	var mount = Node3D.new()
+	mount.name = "Mount"
+	root.add_child(mount)
+	var coat = Color("77523c")
+	sphere(mount,Vector3(0.78,0.85,1.65),Vector3(0,1.02,0.10),coat)
+	var neck = sphere(mount,Vector3(0.46,0.95,0.58),Vector3(0,1.43,-0.60),coat.lightened(0.08))
+	neck.rotation.x = -0.35
+	sphere(mount,Vector3(0.36,0.48,0.61),Vector3(0,1.84,-0.86),coat)
+	sphere(mount,Vector3(0.29,0.25,0.40),Vector3(0,1.68,-1.10),coat.darkened(0.10))
+	for side in [-1,1]:
+		cylinder(mount,0.075,0.015,0.26,Vector3(side*0.12,2.12,-0.74),coat,12)
+		sphere(mount,Vector3.ONE*0.045,Vector3(side*0.18,1.91,-0.94),Color("211e19"))
+		var rein = cylinder(mount,0.014,0.014,0.95,Vector3(side*0.18,1.66,-0.42),Color("3e3026"),8)
+		rein.rotation.x = PI/2-0.20
+	for i in range(7):
+		sphere(mount,Vector3(0.12,0.22,0.20),Vector3(0,1.34+i*0.11,-0.45-i*0.055),Color("352a22"))
+	for i in range(4):
+		var leg = Node3D.new()
+		leg.name = "HorseLeg%d" % i
+		leg.position = Vector3(-0.27 if i%2==0 else 0.27,0.98,-0.45 if i<2 else 0.61)
+		mount.add_child(leg)
+		cylinder(leg,0.09,0.07,0.43,Vector3(0,-0.20,0),coat,16)
+		cylinder(leg,0.055,0.07,0.41,Vector3(0,-0.60,0.03),coat.darkened(0.17),14)
+		sphere(leg,Vector3(0.15,0.16,0.21),Vector3(0,-0.88,-0.01),Color("302d28"))
+	var tail = cylinder(mount,0.07,0.025,0.65,Vector3(0,0.90,1.05),Color("352a22"),12)
+	tail.rotation.x = -0.45
+	box(mount,Vector3(0.82,0.13,0.76),Vector3(0,1.37,0.06),team.darkened(0.25))
+	sphere(mount,Vector3(0.54,0.19,0.60),Vector3(0,1.47,0.05),Color("433225"))
+	var lance = cylinder(rider.get_node("ArmR"),0.025,0.018,1.75,Vector3(0,0.1,-0.16),Color("98734c"),12)
+	lance.rotation.x = -0.28
+	var selection: MeshInstance3D = root.get_node("Selection")
+	selection.scale = Vector3(1.4,1,1.8)
+	return root

@@ -24,6 +24,9 @@ func run() -> void:
 	session.sim.elapsed = 121.5
 	session.sim.wave = 2
 	session.sim.cleared_wave = 2
+	var mounted=session.sim.spawn_unit("cavalry",Vector2(5,0),1)
+	session.sim.units[mounted].hp=60.0
+	session.sim.units[mounted].last_hit_at=120.0
 	session.sim.command(1, "train", [], Vector2.ZERO, "worker")
 	var next_id: int = session.sim.next_id
 	check(session.save_game(false), "save succeeds")
@@ -32,9 +35,10 @@ func run() -> void:
 	check(session.mode == "solo" and session.sim.difficulty == 2 and session.sim.stock.food == 387, "save retains mode, difficulty and resources")
 	check(session.sim.elapsed == 121.5 and session.sim.next_id == next_id and session.sim.queued_population() == 1, "save retains time, unique IDs and queue")
 	check(session.sim.camps.size()==20 and session.sim.units.values().any(func(u): return u.get("guard",false) and u.has("home")), "save restores distant camps and guarding enemies")
+	check(session.sim.units[mounted].kind=="cavalry" and session.sim.units[mounted].hp==60 and session.sim.units[mounted].last_hit_at==120, "save restores mounted unit and healing delay")
 	for i in range(110):
 		session.sim.step(0.05)
-	check(session.sim.population() == 7, "saved queue finishes after resuming")
+	check(session.sim.population() == 8, "saved queue finishes after resuming")
 	session.sim.paused = true
 	session.save_game(false)
 	session.back_to_menu()

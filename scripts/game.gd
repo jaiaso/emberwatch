@@ -73,6 +73,18 @@ func _ready() -> void:
 			Session.solo()
 		if args[i] == "--showcase":
 			_showcase()
+	if "--roles-preview" in args:
+		Session.solo()
+		Session.allow_autosave = false
+		for id in Session.sim.units.keys():
+			if Session.sim.units[id].owner!=0:
+				Session.sim.units.erase(id)
+		for index in range(3):
+			var id = Session.sim.spawn_unit(["soldier","archer","cavalry"][index],Vector2(-6+index*2.5,5.2),1)
+			Session.sim.units[id].hp *= 0.6
+			selected.append(id)
+		camera_center=Vector2(-2,4)
+		zoom=20
 	if "--expedition-preview" in args:
 		Session.solo()
 		Session.allow_autosave = false
@@ -285,7 +297,7 @@ func _sync_models(delta: float) -> void:
 			var direction = goal - old
 			model.rotation.y = lerp_angle(model.rotation.y, atan2(-direction.x, -direction.z), minf(1.0, delta * 12.0))
 		var body: Node3D = model.get_node("Body")
-		body.position.y = absf(sin(float(unit.anim) * 9.0)) * 0.07 if moved > 0.02 else 0.0
+		body.position.y = (0.90 if unit.kind=="cavalry" else 0.0) + (absf(sin(float(unit.anim) * 9.0)) * 0.07 if moved > 0.02 else 0.0)
 		body.rotation.z = sin(float(unit.anim) * 16.0) * 0.12 if unit.order in ["gather", "construct"] and moved < 0.03 else 0.0
 		var swing: float = clampf((sim.elapsed - unit.get("attack_at", -10.0)) / 0.3, 0, 1)
 		body.rotation.x = sin(swing * PI) * 0.4
@@ -296,6 +308,11 @@ func _sync_models(delta: float) -> void:
 		body.get_node("ArmR").rotation.x = stride * 0.7 - sin(swing*PI)*1.4
 		if unit.order in ["gather","construct"] and moved < 0.03:
 			body.get_node("ArmR").rotation.x = -0.8 + sin(float(unit.anim)*6.0)*0.65
+		if unit.kind == "cavalry":
+			body.get_node("LegL").rotation = Vector3(-0.7,0,-0.25)
+			body.get_node("LegR").rotation = Vector3(-0.7,0,0.25)
+			for leg_index in range(4):
+				model.get_node("Mount/HorseLeg%d" % leg_index).rotation.x = sin(float(unit.anim)*10.0+leg_index*PI*0.75)*0.65 if moved>0.02 else 0.0
 		model.get_node("Selection").visible = unit.id in selected
 	for building in sim.buildings.values():
 		if not entities.has(building.id):
@@ -327,7 +344,7 @@ func _pick_unit(screen: Vector2, enemy: bool = false) -> int:
 			continue
 		if not enemy and u.owner != Session.local_id:
 			continue
-		var pos = camera.unproject_position(Vector3(u.p.x, 0.9, u.p.y))
+		var pos = camera.unproject_position(Vector3(u.p.x, 1.6 if u.kind=="cavalry" else 0.9, u.p.y))
 		var d = pos.distance_to(screen)
 		if d < distance:
 			distance = d
@@ -430,6 +447,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			KEY_1: Session.issue("train", [], Vector2.ZERO, "worker")
 			KEY_2: Session.issue("train", [], Vector2.ZERO, "soldier")
 			KEY_3: Session.issue("train", [], Vector2.ZERO, "archer")
+			KEY_4: Session.issue("train", [], Vector2.ZERO, "cavalry")
 			KEY_B: set_build_mode("house")
 			KEY_N: set_build_mode("barracks")
 			KEY_T: set_build_mode("tower")
@@ -542,6 +560,13 @@ func _draw_overlay() -> void:
 	if rally_screen.y > 64 and rally_screen.y < 500:
 		overlay.draw_line(rally_screen, rally_screen + Vector2(0, -22), Color("e5ba74"), 1)
 		overlay.draw_colored_polygon(PackedVector2Array([rally_screen + Vector2(0, -22), rally_screen + Vector2(12, -18), rally_screen + Vector2(0, -14)]), Color("e5ba74"))
+	var hall: Dictionary = Session.sim.buildings.get(1,{})
+	if not hall.is_empty() and hall.hp>0:
+		var ring = PackedVector2Array()
+		for index in range(65):
+			var point: Vector2 = hall.p + Vector2(cos(index*TAU/64),sin(index*TAU/64))*Session.sim.HEAL_RADIUS
+			ring.append(camera.unproject_position(Vector3(point.x,0.05,point.y)))
+		overlay.draw_polyline(ring,Color(0.40,0.85,0.64,0.28),1.4)
 	for camp in Session.sim.camps.values():
 		var amount = Session.sim.camp_amount(camp.id)
 		if amount <= 0:
@@ -560,12 +585,16 @@ func _draw_overlay() -> void:
 			if Rect2(0,145,1152,350).has_point(marker):
 				overlay.draw_string(hud.root.get_theme_default_font(),marker+Vector2(-10,0),"守備",HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("ffb37a"))
 		if u.owner != 0:
-			var marker = camera.unproject_position(Vector3(u.p.x, 2.2, u.p.y))
+			var marker = camera.unproject_position(Vector3(u.p.x, 3.0 if u.kind=="cavalry" else 2.2, u.p.y))
 			if Rect2(0, 145, 1152, 350).has_point(marker):
-				overlay.draw_string(hud.root.get_theme_default_font(), marker + Vector2(-5, -3), {"worker": "農", "soldier": "剣", "archer": "弓"}.get(u.kind, ""), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, {"worker": Color("ffe092"), "soldier": Color("e7f2ff"), "archer": Color("a2edb1")}.get(u.kind, Color.WHITE))
+				overlay.draw_string(hud.root.get_theme_default_font(), marker + Vector2(-5, -3), {"worker": "農", "soldier": "盾", "archer": "弓", "cavalry": "騎"}.get(u.kind, ""), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, {"worker": Color("ffe092"), "soldier": Color("e7f2ff"), "archer": Color("a2edb1"), "cavalry": Color("f4cd88")}.get(u.kind, Color.WHITE))
+		if u.get("healing",false):
+			var heal_pos = camera.unproject_position(Vector3(u.p.x,2.9 if u.kind=="cavalry" else 2.1,u.p.y))
+			if Rect2(0,145,1152,350).has_point(heal_pos):
+				overlay.draw_string(hud.root.get_theme_default_font(),heal_pos+Vector2(7,-3),"+",HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("8befb2"))
 		if u.id not in selected and u.hp >= u.max_hp:
 			continue
-		var pos = camera.unproject_position(Vector3(u.p.x, 1.9 if u.kind != "brute" else 2.7, u.p.y))
+		var pos = camera.unproject_position(Vector3(u.p.x, 3.0 if u.kind=="cavalry" else 1.9 if u.kind != "brute" else 2.7, u.p.y))
 		_bar(pos, u.hp / u.max_hp, 25.0, Color("bacc88") if u.owner != 0 else Color("d47b61"))
 	for b in Session.sim.buildings.values():
 		if b.hp >= b.max_hp and b.progress >= 1.0 and b.kind != "hall":

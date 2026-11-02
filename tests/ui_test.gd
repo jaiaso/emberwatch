@@ -130,6 +130,20 @@ func run() -> void:
 	await key(KEY_F8)
 	check(game.high_quality and game.world_environment.ssao_enabled, "F8 restores enhanced graphics")
 	check(game.entities.values().any(func(node): return node.has_node("Body/ArmR") and node.has_node("Body/LegL")), "articulated models attached to simulation units")
+	await click(Vector2(280,576))
+	await click(Vector2(650,625))
+	check(session.sim.buildings[2].queue.any(func(job): return job.kind=="cavalry"), "cavalry button queues mounted unit")
+	for i in range(610):
+		session.sim.step(0.05)
+	await process_frame
+	await process_frame
+	var mounted=-1
+	for u in session.sim.units.values():
+		if u.kind=="cavalry":
+			mounted=u.id
+	check(mounted!=-1 and game.entities[mounted].has_node("Mount/HorseLeg0"), "cavalry finishes training with animated horse model")
+	await key(KEY_4)
+	check(session.sim.queued_population()==1, "4 queues cavalry through normal input")
 	print("UI_TEST ", checks - failures.size(), "/", checks, " PASS; failures=", failures)
 	game.queue_free()
 	await process_frame

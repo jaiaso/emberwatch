@@ -45,7 +45,7 @@ func _initialize() -> void:
 	check(sim.players[2].skill_points == 1 and sim.players[2].skills.power == 0, "choice does not spend ally reward")
 	sim.command(2, "skill", [], Vector2.ZERO, "vitality")
 	var soldier = sim.spawn_unit("soldier", Vector2(-5, -5), 2)
-	check(is_equal_approx(sim.units[soldier].max_hp, 150), "future troops inherit HP skill")
+	check(is_equal_approx(sim.units[soldier].max_hp, 210), "future troops inherit HP skill")
 	var copy = Sim.new()
 	copy.apply_snapshot(sim.snapshot())
 	check(copy.players[1].skills.power == 1 and copy.players[2].skills.vitality == 1, "skills survive snapshot and save")
@@ -59,7 +59,7 @@ func _initialize() -> void:
 	var victim = sim.spawn_unit("raider", Vector2(-7, -8), 0)
 	var hp: float = sim.units[victim].hp
 	sim._strike(sim.units[attacker], sim.units[victim], 0.05)
-	check(is_equal_approx(hp - sim.units[victim].hp, 18 * 1.30), "two power levels add thirty percent damage")
+	check(is_equal_approx(hp - sim.units[victim].hp, 10 * 1.30), "two power levels add thirty percent damage")
 	sim.players[1].skill_points = 1
 	sim.command(1, "skill", [], Vector2.ZERO, "harvest")
 	var resource = {}

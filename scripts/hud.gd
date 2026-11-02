@@ -5,7 +5,7 @@ const Sim = preload("res://scripts/simulation.gd")
 const CREAM = Color("e4d8b7")
 const MUTED = Color("91a296")
 const GOLD = Color("e0b973")
-const NAMES = {"worker": "村人", "soldier": "剣士", "archer": "弓兵"}
+const NAMES = {"worker": "村人", "soldier": "剣士", "archer": "弓兵", "cavalry": "騎兵"}
 var game
 var root: Control
 var menu: Panel
@@ -184,7 +184,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.3.0     —     遠征と守備隊", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.4.0     —     盾と騎兵", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -192,7 +192,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.3.0", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.4.0", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -238,11 +238,12 @@ func _make_play_ui() -> void:
 		tabs.append(tab)
 		var index = i
 		tab_buttons.append(_button(play_ui, ["部隊を生産", "村を建設", "全軍を強化"][i], Rect2(207 + i * 174, 562, 164, 29), func(): _select_tab(index)))
-	var train = [["worker", "[1] 村人\n食料45 · 5秒"], ["soldier", "[2] 剣士\n食料55 / 金20 · 18秒"], ["archer", "[3] 弓兵\n木45 / 金25 · 22秒"]]
+	var train = [["worker", "[1] 村人\n食45 / 5秒"], ["soldier", "[2] 剣士・盾役\n食55 金20 /18秒"], ["archer", "[3] 弓兵\n木45 金25 /22秒"], ["cavalry", "[4] 騎兵\n食110 金70 /30秒"]]
 	for i in range(train.size()):
 		var key: String = train[i][0]
-		buttons[key] = _button(tabs[0], train[i][1], Rect2(207 + i * 174, 601, 164, 49), func(): Session.issue("train", [], Vector2.ZERO, key))
-		buttons[key].add_theme_font_size_override("font_size", 12)
+		buttons[key] = _button(tabs[0], train[i][1], Rect2(207 + i * 130, 601, 123, 49), func(): Session.issue("train", [], Vector2.ZERO, key))
+		buttons[key].add_theme_font_size_override("font_size", 10)
+		buttons[key].tooltip_text = "HP %d / 攻撃 %d / 軽減 %d%% / 速度 %.1f / 射程 %.1f" % [Sim.UNIT_DATA[key].hp,Sim.UNIT_DATA[key].damage,roundi(Sim.UNIT_DATA[key].get("armor",0)*100),Sim.UNIT_DATA[key].speed,Sim.UNIT_DATA[key].range]
 	queue_label = _label(tabs[0], "", Vector2(383, 663), 11, MUTED)
 	queue_bar = _bar(tabs[0], Rect2(383, 689, 338, 6), Color("a3b67b"))
 	_button(tabs[0], "[C] 自分の予約を取消", Rect2(207, 666, 164, 31), func(): Session.issue("cancel_train"))
@@ -258,8 +259,9 @@ func _make_play_ui() -> void:
 	_panel(play_ui, Rect2(745, 517, 1, 184), Color("4d6652"))
 	hp_label = _label(play_ui, "", Vector2(767, 513), 16, GOLD)
 	hp_bar = _bar(play_ui, Rect2(768, 545, 360, 8), Color("a0b878"))
-	_button(play_ui, "[R] 砦を修復 · 木60", Rect2(767, 568, 174, 35), func(): Session.issue("repair"))
-	_button(play_ui, "[Y] 集合地点", Rect2(953, 568, 175, 35), func(): game.cancel_mode(); game.rally_mode = true)
+	_label(play_ui, "周囲8マス · 被弾後5秒で毎秒4HP回復", Vector2(768, 554), 10, MUTED)
+	_button(play_ui, "[R] 砦を修復 · 木60", Rect2(767, 576, 174, 31), func(): Session.issue("repair"))
+	_button(play_ui, "[Y] 集合地点", Rect2(953, 576, 175, 31), func(): game.cancel_mode(); game.rally_mode = true)
 	buttons.pause = _button(play_ui, "[P] 一時停止", Rect2(767, 613, 174, 33), func(): Session.issue("pause"))
 	buttons.save = _button(play_ui, "[F9] セーブ", Rect2(953, 613, 175, 33), func(): Session.issue("save"))
 	_label(play_ui, "F 全兵士 / V 全村人 / Z 待機村人\nE 進軍攻撃 / X 停止 / Ctrl+6〜9 部隊登録", Vector2(767, 661), 11, MUTED)
@@ -285,7 +287,7 @@ func _make_lobby() -> void:
 func _make_help() -> void:
 	help_panel = _panel(root, Rect2(230, 87, 692, 535), Color(0.05, 0.12, 0.10, 0.99))
 	_label(help_panel, "指 揮 官 の 手 引 き", Vector2(28, 23), 24, GOLD)
-	_label(help_panel, "左クリック / ドラッグ     自分の部隊を選択（Shiftで追加）\nダブルクリック                画面内の同じ兵種をまとめて選択\n右クリック                        移動 / 敵を攻撃 / 村人で資源を採集\nWASD / 矢印 / 中ボタン     カメラ移動\nホイール / Space              拡大縮小 / 中央砦へ戻る\n1 / 2 / 3 / C                         村人 / 剣士 / 弓兵を予約 / 予約取消\nB / N / T                              家 / 兵舎 / 監視塔を設置\nE / X / Y                               進軍攻撃 / 停止 / 新兵の集合地点\nF / V / Z                               全兵士 / 全村人 / 待機村人\nU / L / R                               武器強化 / 建物強化 / 砦の修復\nCtrl+6〜9 → 6〜9                部隊グループ登録 → 呼び出し\nP / F9 / M                            一時停止 / セーブ（ソロ） / 消音", Vector2(29, 80), 13)
+	_label(help_panel, "左クリック / ドラッグ     自分の部隊を選択（Shiftで追加）\nダブルクリック                画面内の同じ兵種をまとめて選択\n右クリック                        移動 / 敵を攻撃 / 村人で資源を採集\nWASD / 矢印 / 中ボタン     カメラ移動\nホイール / Space              拡大縮小 / 中央砦へ戻る\n1 / 2 / 3 / 4 / C                  村人 / 剣士 / 弓兵 / 騎兵 / 取消\nB / N / T                              家 / 兵舎 / 監視塔を設置\nE / X / Y                               進軍攻撃 / 停止 / 新兵の集合地点\nF / V / Z                               全兵士 / 全村人 / 待機村人\nU / L / R                               武器強化 / 建物強化 / 砦の修復\nCtrl+6〜9 → 6〜9                部隊グループ登録 → 呼び出し\nP / F9 / M                            一時停止 / セーブ（ソロ） / 消音", Vector2(29, 80), 13)
 	_label(help_panel, "最初はVで村人を選び、木・畑・金鉱を右クリック。\n6波目の敵と指揮官を倒せば勝利。中央砦が壊れると全員敗北。\nソロはこの画面で一時停止。オンライン中は時間が進みます。", Vector2(29, 397), 12, MUTED)
 	_button(help_panel, "戦場へ戻る", Rect2(29, 477, 307, 38), toggle_help, true)
 	_button(help_panel, "タイトルへ戻る（退出）", Rect2(350, 477, 313, 38), func(): help_panel.hide(); paused_by_help = false; Session.back_to_menu())
@@ -363,15 +365,15 @@ func _process(delta: float) -> void:
 	var hall: Dictionary = sim.buildings.get(1, {})
 	hp_label.text = "中央砦  %d / %d" % [int(maxf(0, hall.get("hp", 0))), int(hall.get("max_hp", 1500))]
 	hp_bar.value = hall.get("hp", 0) / hall.get("max_hp", 1500.0)
-	var counts = {"worker": 0, "soldier": 0, "archer": 0}
+	var counts = {"worker": 0, "soldier": 0, "archer": 0, "cavalry": 0}
 	for id in game.selected:
 		if sim.units.has(id):
 			counts[sim.units[id].kind] += 1
-	selection_label.text = "部隊を選択" if game.selected.is_empty() else "%d部隊  ·  村人%d / 剣士%d / 弓兵%d" % [game.selected.size(), counts.worker, counts.soldier, counts.archer]
+	selection_label.text = "部隊を選択" if game.selected.is_empty() else "%d部隊 · 村%d / 盾%d / 弓%d / 騎%d" % [game.selected.size(), counts.worker, counts.soldier, counts.archer, counts.cavalry]
 	task_label.text = "%s  ·  %d人で防衛  ·  %s  ·  待機村人 %d" % [sim.players.get(Session.local_id, {}).get("name", "接続中"), sim.players.size(), Sim.DIFFICULTIES[sim.difficulty], sim.worker_count(true, Session.local_id)]
 	for key in ["house", "barracks", "tower"]:
 		buttons[key].disabled = counts.worker == 0 or not sim.running or not sim.can_afford(Sim.BUILD_DATA[key].cost)
-	for key in ["worker", "soldier", "archer"]:
+	for key in ["worker", "soldier", "archer", "cavalry"]:
 		buttons[key].disabled = not sim.running or not sim.can_afford(Sim.UNIT_DATA[key].cost) or sim.population() + sim.queued_population() >= sim.capacity()
 	for key in ["weapons", "masonry"]:
 		buttons[key].disabled = sim.upgrades[key] or not sim.can_afford(Sim.RESEARCH[key].cost)
@@ -391,7 +393,7 @@ func _process(delta: float) -> void:
 	buttons.pause.text = "[P] 再開する" if sim.paused else "[P] 一時停止"
 	paused_label.visible = sim.paused and not help_panel.visible
 	tutorial_panel.visible = sim.elapsed < 150 and (sim.stats.gathered == 0 or sim.stats.trained == 0 or sim.stats.built == 0)
-	tutorial.text = "%s Vで村人を選択 → 資源を右クリック\n%s 1 / 2 / 3 で村人・兵士を予約\n%s 村人を選択 → Bで家を建てる" % ["✓" if sim.stats.gathered > 0 else "1.", "✓" if sim.stats.trained > 0 else "2.", "✓" if sim.stats.built > 0 else "3."]
+	tutorial.text = "%s Vで村人を選択 → 資源を右クリック\n%s 1 / 2 / 3 / 4 で部隊を予約\n%s 村人を選択 → Bで家を建てる" % ["✓" if sim.stats.gathered > 0 else "1.", "✓" if sim.stats.trained > 0 else "2.", "✓" if sim.stats.built > 0 else "3."]
 	boss_panel.hide()
 	for u in sim.units.values():
 		if u.kind == "warlord":

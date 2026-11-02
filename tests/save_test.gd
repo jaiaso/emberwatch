@@ -23,6 +23,7 @@ func run() -> void:
 	session.sim.stock.food = 432
 	session.sim.elapsed = 121.5
 	session.sim.wave = 2
+	session.sim.cleared_wave = 2
 	session.sim.command(1, "train", [], Vector2.ZERO, "worker")
 	var next_id: int = session.sim.next_id
 	check(session.save_game(false), "save succeeds")
@@ -30,7 +31,8 @@ func run() -> void:
 	check(session.continue_game(), "saved game resumes")
 	check(session.mode == "solo" and session.sim.difficulty == 2 and session.sim.stock.food == 387, "save retains mode, difficulty and resources")
 	check(session.sim.elapsed == 121.5 and session.sim.next_id == next_id and session.sim.queued_population() == 1, "save retains time, unique IDs and queue")
-	for i in range(70):
+	check(session.sim.camps.size()==20 and session.sim.units.values().any(func(u): return u.get("guard",false) and u.has("home")), "save restores distant camps and guarding enemies")
+	for i in range(110):
 		session.sim.step(0.05)
 	check(session.sim.population() == 7, "saved queue finishes after resuming")
 	session.sim.paused = true

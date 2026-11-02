@@ -86,7 +86,7 @@ func _process(delta: float) -> bool:
 			session.issue("skill", [], Vector2.ZERO, "power")
 			sent = true
 		if sent and clock > 7.0:
-			var passed = session.sim.players[session.local_id].skills.power == 1 and session.sim.players[session.local_id].skill_points == 0 and session.sim.tick > 50 and session.sim.units[own].order == "move" and session.sim.units[host_unit].target == host_target and session.sim.units[own].p.distance_to(Vector2(25, 20)) < 30.0
+			var passed = session.sim.camps.size()==20 and session.sim.units.values().any(func(u): return u.get("guard",false)) and session.sim.players[session.local_id].skills.power == 1 and session.sim.players[session.local_id].skill_points == 0 and session.sim.tick > 50 and session.sim.units[own].order == "move" and session.sim.units[host_unit].target == host_target and session.sim.units[own].p.distance_to(Vector2(25, 20)) < 30.0
 			print("NETWORK_CLIENT ", role, " peer=", session.local_id, " tick=", session.sim.tick, " own_order=", session.sim.units[own].order, " PASS=", passed)
 			# Remain connected until the host has checked all three owners.
 			if not passed:

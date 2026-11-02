@@ -73,6 +73,11 @@ func _ready() -> void:
 			Session.solo()
 		if args[i] == "--showcase":
 			_showcase()
+	if "--expedition-preview" in args:
+		Session.solo()
+		Session.allow_autosave = false
+		camera_center = Vector2(36,-18)
+		zoom = 35
 	if "--landscape" in args:
 		Session.solo()
 		Session.allow_autosave = false
@@ -303,6 +308,7 @@ func _sync_models(delta: float) -> void:
 		if not resource_nodes.has(resource.id):
 			var model = art.make_resource(resource.kind, resource.id)
 			model.position = Vector3(resource.p.x, 0, resource.p.y)
+			model.scale = Vector3.ONE * (1.0 + 0.12 * (resource.get("tier",1)-1))
 			add_child(model)
 			resource_nodes[resource.id] = model
 		resource_nodes[resource.id].visible = resource.amount > 0
@@ -536,14 +542,23 @@ func _draw_overlay() -> void:
 	if rally_screen.y > 64 and rally_screen.y < 500:
 		overlay.draw_line(rally_screen, rally_screen + Vector2(0, -22), Color("e5ba74"), 1)
 		overlay.draw_colored_polygon(PackedVector2Array([rally_screen + Vector2(0, -22), rally_screen + Vector2(12, -18), rally_screen + Vector2(0, -14)]), Color("e5ba74"))
-	for res in Session.sim.resources.values():
-		if res.amount <= 0 or res.kind == "wood":
+	for camp in Session.sim.camps.values():
+		var amount = Session.sim.camp_amount(camp.id)
+		if amount <= 0:
 			continue
-		var rp = camera.unproject_position(Vector3(res.p.x, 2.4, res.p.y))
-		if Rect2(0, 145, 1152, 350).has_point(rp):
-			overlay.draw_style_box(hud._style(Color("142a24"), Color("b5a765")), Rect2(rp - Vector2(17, 14), Vector2(42, 19)))
-			overlay.draw_string(hud.root.get_theme_default_font(), rp + Vector2(-12, 0), "畑" if res.kind == "food" else "金鉱", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("ffe092"))
+		var rp = camera.unproject_position(Vector3(camp.p.x,3.0,camp.p.y))
+		if Rect2(80,145,990,335).has_point(rp):
+			var guards = Session.sim.camp_guards(camp.id)
+			var text = "%s%s · %d / 守備%d" % [["小規模 ","中規模 ","大規模 "][camp.tier-1], {"wood":"森林","food":"畑","gold":"金鉱"}[camp.kind], amount,guards]
+			var font = hud.root.get_theme_default_font()
+			var width = font.get_string_size(text,HORIZONTAL_ALIGNMENT_LEFT,-1,11).x+14
+			overlay.draw_style_box(hud._style(Color("142a24"),Color("b5a765")),Rect2(rp-Vector2(width/2,15),Vector2(width,22)))
+			overlay.draw_string(font,rp+Vector2(-width/2+7,0),text,HORIZONTAL_ALIGNMENT_LEFT,-1,11,Color("ffc17a") if guards>0 else Color("ffe092"))
 	for u in Session.sim.units.values():
+		if u.get("guard",false):
+			var marker = camera.unproject_position(Vector3(u.p.x,2.5,u.p.y))
+			if Rect2(0,145,1152,350).has_point(marker):
+				overlay.draw_string(hud.root.get_theme_default_font(),marker+Vector2(-10,0),"守備",HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("ffb37a"))
 		if u.owner != 0:
 			var marker = camera.unproject_position(Vector3(u.p.x, 2.2, u.p.y))
 			if Rect2(0, 145, 1152, 350).has_point(marker):

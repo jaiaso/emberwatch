@@ -7,8 +7,8 @@ signal pinged(pos: Vector2)
 
 const Simulation = preload("res://scripts/simulation.gd")
 const PORT = 27840
-const VERSION = "1.2.0" # Wire/save format; UI-only v1.2.1 keeps compatibility.
-const SAVE_PATH = "user://emberwatch-v12.save"
+const VERSION = "1.3.0"
+const SAVE_PATH = "user://emberwatch-v13.save"
 const SAVE_MAGIC = "EMBERWATCH_SAVE_1"
 var sim = Simulation.new()
 var mode = "menu"
@@ -69,20 +69,20 @@ func back_to_menu() -> void:
 	changed.emit()
 
 func solo(level: int = -1) -> void:
-	back_to_menu()
 	if level >= 0:
 		sim.difficulty = clampi(level, 0, 2)
-	sim.next_wave = [85.0, 70.0, 60.0][sim.difficulty]
+	back_to_menu()
+	sim.next_wave = Simulation.PREPARATION_TIME
 	saved_wave = 0
 	mode = "solo"
 	sim.running = true
 	changed.emit()
 
 func host(level: int = -1) -> void:
-	back_to_menu()
 	if level >= 0:
 		sim.difficulty = clampi(level, 0, 2)
-	sim.next_wave = [85.0, 70.0, 60.0][sim.difficulty]
+	back_to_menu()
+	sim.next_wave = Simulation.PREPARATION_TIME
 	var peer = ENetMultiplayerPeer.new()
 	var error = peer.create_server(PORT, 3)
 	if error != OK:
@@ -281,7 +281,7 @@ func rematch() -> void:
 	sim.reset()
 	for id in peers:
 		sim.add_player(id)
-	sim.next_wave = [85.0, 70.0, 60.0][sim.difficulty]
+	sim.next_wave = Simulation.PREPARATION_TIME
 	saved_wave = 0
 	sim.running = true
 	if mode == "host":

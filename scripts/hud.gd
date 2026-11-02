@@ -184,7 +184,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.2.1     —     光と鋼", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.3.0     —     遠征と守備隊", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -192,7 +192,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.2.1", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.3.0", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -238,7 +238,7 @@ func _make_play_ui() -> void:
 		tabs.append(tab)
 		var index = i
 		tab_buttons.append(_button(play_ui, ["部隊を生産", "村を建設", "全軍を強化"][i], Rect2(207 + i * 174, 562, 164, 29), func(): _select_tab(index)))
-	var train = [["worker", "[1] 村人\n食料45 · 3秒"], ["soldier", "[2] 剣士\n食料55 / 金20 · 4秒"], ["archer", "[3] 弓兵\n木45 / 金25 · 5秒"]]
+	var train = [["worker", "[1] 村人\n食料45 · 5秒"], ["soldier", "[2] 剣士\n食料55 / 金20 · 18秒"], ["archer", "[3] 弓兵\n木45 / 金25 · 22秒"]]
 	for i in range(train.size()):
 		var key: String = train[i][0]
 		buttons[key] = _button(tabs[0], train[i][1], Rect2(207 + i * 174, 601, 164, 49), func(): Session.issue("train", [], Vector2.ZERO, key))
@@ -359,7 +359,7 @@ func _process(delta: float) -> void:
 		incoming_label.text = "準備：第%d波・%sから" % [incoming.wave, incoming.direction]
 	wave_label.text = "襲撃  %02d / 06" % sim.wave
 	var remain = int(maxf(0, sim.next_wave - sim.elapsed))
-	time_label.text = "敵 %d  ·  次まで %02d:%02d" % [sim.enemies_left(), remain / 60, remain % 60] if sim.wave < 6 else "敵残り %d  ·  最後の夜" % sim.enemies_left()
+	time_label.text = "襲撃敵 %d · 撃退後に5分準備" % sim.enemies_left() if sim.enemies_left()>0 else "準備時間 %02d:%02d" % [remain / 60, remain % 60] if sim.wave<6 else "最後の夜"
 	var hall: Dictionary = sim.buildings.get(1, {})
 	hp_label.text = "中央砦  %d / %d" % [int(maxf(0, hall.get("hp", 0))), int(hall.get("max_hp", 1500))]
 	hp_bar.value = hall.get("hp", 0) / hall.get("max_hp", 1500.0)

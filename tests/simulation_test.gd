@@ -29,7 +29,7 @@ func run() -> void:
 	var font: FontFile = load("res://assets/NotoSansJP.ttf")
 	print("FONT_AXES ", font.get_supported_variation_list())
 	var sim = fresh()
-	check(sim.units.size() == 6 and sim.population() == 6, "initial army")
+	check(sim.population() == 6 and sim.units.size() > 6, "initial army")
 	check(sim.buildings.has(1) and sim.resources.size() > 120, "deterministic settlement")
 	var worker = -1
 	for u in sim.units.values():
@@ -37,7 +37,7 @@ func run() -> void:
 			worker = u.id
 			break
 	sim.add_player(2)
-	check(sim.players.size() == 2 and sim.units.size() == 12, "second player joins")
+	check(sim.players.size() == 2 and sim.population() == 12, "second player joins")
 	var before: Vector2 = sim.units[worker].target
 	check(sim.command(2, "move", [worker], Vector2(20, 20)) != "", "cannot command ally units")
 	check(sim.units[worker].target == before, "rejected command does not mutate unit")
@@ -71,7 +71,7 @@ func run() -> void:
 	sim.stock.food = 100
 	check(sim.command(1, "train", [], Vector2.ZERO, "worker") == "" and sim.stock.food == 55, "successful production spends shared resource")
 	check(sim.population() == population and sim.queued_population() == 1, "production reserves population before completion")
-	advance(sim, 3.5)
+	advance(sim, 5.5)
 	check(sim.population() == population + 1 and sim.queued_population() == 0, "queued unit finishes after training time")
 	sim.buildings[1].hp = 900.0
 	sim.stock.wood = 100
@@ -83,7 +83,7 @@ func run() -> void:
 	client.stock.food = -999
 	check(sim.stock.food != -999, "snapshot does not alias host state")
 	sim.remove_player(2)
-	check(sim.units.values().all(func(u): return u.owner == 1), "disconnect transfers army to host")
+	check(sim.units.values().all(func(u): return u.owner in [0, 1]), "disconnect transfers army to host")
 	sim = fresh()
 	sim.units.clear()
 	sim._spawn_building("tower", Vector2(8, -4), 1, true)
@@ -99,12 +99,12 @@ func run() -> void:
 	sim = fresh()
 	sim.next_wave = 0
 	sim.step(0.05)
-	check(sim.wave == 1 and sim.enemies_left() == 8, "wave spawns expected raiders")
+	check(sim.wave == 1 and sim.enemies_left() == 16, "wave spawns expected raiders")
 	sim = fresh()
 	sim.add_player(2)
 	sim.next_wave = 0
 	sim.step(0.05)
-	check(sim.enemies_left() == 16, "waves scale with players")
+	check(sim.enemies_left() == 32, "waves scale with players")
 	sim = fresh()
 	sim.units.clear()
 	enemy = sim.spawn_unit("raider", Vector2(-30, -25), 0)

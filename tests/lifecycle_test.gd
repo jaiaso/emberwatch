@@ -47,7 +47,7 @@ func _process(delta: float) -> bool:
 		if phase == 2 and clock > 9:
 			passed = session.sim.players.size() == 2 and session.sim.running
 			for u in session.sim.units.values():
-				passed = passed and session.sim.players.has(u.owner)
+				passed = passed and (u.owner == 0 or session.sim.players.has(u.owner))
 			for b in session.sim.buildings.values():
 				for job in b.queue:
 					passed = passed and session.sim.players.has(job.owner)

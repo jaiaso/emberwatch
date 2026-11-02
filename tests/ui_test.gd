@@ -96,7 +96,7 @@ func run() -> void:
 	check(game.sound.muted, "M mutes music and sound")
 	await key(KEY_1)
 	check(session.sim.population() == 6 and session.sim.queued_population() == 1, "1 queues worker through input")
-	for i in range(70):
+	for i in range(110):
 		session.sim.step(0.05)
 	check(session.sim.population() == 7, "worker finishes training")
 	await key(KEY_6, true)

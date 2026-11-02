@@ -33,7 +33,7 @@ func _draw() -> void:
 	for b in sim.buildings.values():
 		draw_rect(Rect2(_point(b.p) - Vector2(3, 3), Vector2(6, 6)), Color("d8c89d"))
 	for u in sim.units.values():
-		var color = Color("df765e") if u.owner == 0 else Color("94cfb6")
+		var color = Color("f4a04c") if u.get("guard",false) else Color("df765e") if u.owner == 0 else Color("94cfb6")
 		draw_circle(_point(u.p), 1.5 if u.owner else 2.0, color)
 	var incoming: Dictionary = sim.incoming_attack()
 	if not incoming.is_empty():

@@ -4,12 +4,13 @@ extends RefCounted
 const Terrain = preload("res://scripts/terrain_data.gd")
 const MAP_HALF = Terrain.HALF
 const WAVE_COUNT = 6
-const WAVE_INTERVAL = 70.0
+const PREPARATION_TIME = 300.0
+const WAVE_INTERVAL = PREPARATION_TIME
 const WAVE_DIRECTIONS = ["北西", "北東", "南東", "南西"]
 const WAVE_ORIGINS = [Vector2(-50, -45), Vector2(49, -44), Vector2(47, 49), Vector2(-48, 46)]
 const Navigation = preload("res://scripts/navigation.gd")
 const DIFFICULTIES = ["穏やかな夜", "標準の夜", "苛烈な夜"]
-const TRAIN_TIME = {"worker": 3.0, "soldier": 4.0, "archer": 5.0}
+const TRAIN_TIME = {"worker": 5.0, "soldier": 18.0, "archer": 22.0}
 const RESEARCH = {
 	"weapons": {"name": "鋼の武器", "cost": {"food": 120, "gold": 100}},
 	"masonry": {"name": "石造の砦", "cost": {"wood": 180, "gold": 100}},
@@ -38,6 +39,7 @@ const BUILD_DATA = {
 var units: Dictionary = {}
 var buildings: Dictionary = {}
 var resources: Dictionary = {}
+var camps: Dictionary = {}
 var players: Dictionary = {}
 var stock: Dictionary = {}
 var elapsed = 0.0
@@ -68,6 +70,7 @@ func reset() -> void:
 	units.clear()
 	buildings.clear()
 	resources.clear()
+	camps.clear()
 	players.clear()
 	stock = {"food": 280, "wood": 320, "gold": 180}
 	elapsed = 0.0
@@ -93,14 +96,54 @@ func reset() -> void:
 	_spawn_building("hall", Vector2.ZERO, 0, true)
 	_spawn_building("barracks", Vector2(7, 3), 0, true)
 	for cluster in [Vector2(-13, -8), Vector2(15, -13), Vector2(-18, 13), Vector2(20, 14), Vector2(-43, 32), Vector2(40, -35), Vector2(-42, -39), Vector2(40, 38)]:
-		for i in range(12):
-			_add_resource("wood", cluster + Vector2(rng.randf_range(-5, 5), rng.randf_range(-5, 5)), 160)
+		_add_camp("wood", cluster)
 	for cluster in [Vector2(-11, 6), Vector2(11, -9), Vector2(-41, 10), Vector2(36, -13), Vector2(12, 42), Vector2(-13, -45)]:
-		for i in range(4):
-			_add_resource("food", cluster + Vector2(i % 2, i / 2) * 3.2, 150)
+		_add_camp("food", cluster)
 	for cluster in [Vector2(3, 13), Vector2(-15, -18), Vector2(-43, -5), Vector2(39, 12), Vector2(-28, 43), Vector2(29, -43)]:
-		for i in range(3):
-			_add_resource("gold", cluster + Vector2(i * 2.5, 0), 300)
+		_add_camp("gold", cluster)
+
+func _add_camp(kind: String, center: Vector2) -> void:
+	var tier = 1 if center.length() < 26 else 2 if center.length() < 44 else 3
+	var id = _id()
+	camps[id] = {"id": id, "kind": kind, "p": center, "tier": tier}
+	var count = {"wood": [12,18,24], "food": [4,8,12], "gold": [3,6,9]}[kind][tier-1]
+	var amount = {"wood": [100,220,360], "food": [100,240,420], "gold": [140,400,720]}[kind][tier-1]
+	var columns = ceili(sqrt(float(count)))
+	var spacing = 2.5 if kind == "wood" else 3.0 if kind == "gold" else 3.4 + (tier-1)*0.2
+	for i in range(count):
+		var offset = Vector2(i % columns - (columns-1)*0.5, floori(float(i)/columns) - (ceili(float(count)/columns)-1)*0.5) * spacing
+		var pos = center + offset
+		if absf(pos.x)>55 or absf(pos.y)>55 or Terrain.blocked(pos,2.0):
+			continue
+		var resource = _id()
+		resources[resource] = {"id":resource, "kind":kind, "p":pos, "amount":amount, "max_amount":amount, "camp":id, "tier":tier}
+	if tier > 1:
+		for i in range(3 if tier == 2 else 5):
+			var pos = center
+			for attempt in range(24):
+				var angle = (i * 1.9 + attempt * 0.37)
+				var candidate = center + Vector2(cos(angle),sin(angle))*6.5
+				if not Terrain.blocked(candidate,1.0) and absf(candidate.x)<56 and absf(candidate.y)<56:
+					pos = candidate
+					break
+			var guard = spawn_unit("brute" if tier == 3 and i == 0 else "slinger" if i == 1 else "raider",pos,0)
+			units[guard].guard = true
+			units[guard].camp = id
+			units[guard].home = center
+
+func camp_guards(camp_id: int) -> int:
+	var count = 0
+	for unit in units.values():
+		if unit.get("guard", false) and unit.get("camp", -1) == camp_id and unit.hp > 0:
+			count += 1
+	return count
+
+func camp_amount(camp_id: int) -> int:
+	var amount = 0
+	for res in resources.values():
+		if res.get("camp", -1) == camp_id:
+			amount += res.amount
+	return amount
 
 func _id() -> int:
 	var value = next_id
@@ -197,7 +240,7 @@ func worker_count(idle_only: bool = false, owner: int = -1) -> int:
 func enemies_left() -> int:
 	var count = 0
 	for unit in units.values():
-		if unit.owner == 0:
+		if unit.owner == 0 and not unit.get("guard",false):
 			count += 1
 	return count
 
@@ -223,7 +266,7 @@ func valid_site(kind: String, pos: Vector2) -> bool:
 		if pos.distance_to(b.p) < radius + float(BUILD_DATA[b.kind].radius) + 0.8:
 			return false
 	for res in resources.values():
-		if res.amount > 0 and pos.distance_to(res.p) < radius + 0.65:
+		if res.amount > 0 and pos.distance_to(res.p) < radius + (0.65 if res.kind=="wood" else 1.35 * (1.0+0.12*(res.get("tier",1)-1))):
 			return false
 	return true
 
@@ -432,7 +475,7 @@ func step(delta: float) -> void:
 	if wave > cleared_wave and enemies_left() == 0:
 		var rewards = wave - cleared_wave
 		cleared_wave = wave
-		next_wave = maxf(next_wave, elapsed + 22.0)
+		next_wave = elapsed + PREPARATION_TIME
 		for player in players.values():
 			player.skill_points = player.get("skill_points", 0) + rewards
 		if wave < WAVE_COUNT:
@@ -461,19 +504,23 @@ func incoming_attack() -> Dictionary:
 
 func _spawn_wave() -> void:
 	wave += 1
-	next_wave = elapsed + [85.0, WAVE_INTERVAL, 60.0][difficulty]
+	next_wave = elapsed + PREPARATION_TIME
 	var approach = approach_for_wave(wave)
 	var origin: Vector2 = approach.origin
-	var count = (5 + wave * 3) * maxi(1, players.size())
+	var count = (8 + wave * 8) * maxi(1, players.size())
 	count = mini(int(ceil(count * [0.75, 1.0, 1.15][difficulty])), 100)
 	for i in range(count):
-		var kind = "brute" if wave >= 3 and i % 7 == 0 else "raider"
+		var kind = "brute" if wave >= 2 and i % 7 == 0 else "raider"
 		if wave >= 2 and i % 6 == 2:
 			kind = "slinger"
-		spawn_unit(kind, origin + Vector2(rng.randf_range(-3, 3), rng.randf_range(-3, 3)), 0)
+		var enemy = spawn_unit(kind, origin + Vector2(rng.randf_range(-3, 3), rng.randf_range(-3, 3)), 0)
+		units[enemy].hp *= 1.0 + 0.10 * (wave-1)
+		units[enemy].max_hp = units[enemy].hp
+		units[enemy].wave_power = 1.0 + 0.07 * (wave-1)
 	if wave == WAVE_COUNT:
 		var boss = spawn_unit("warlord", origin + Vector2(0, 3), 0)
-		units[boss].hp *= 1.0 + 0.45 * (players.size() - 1)
+		units[boss].hp *= 3.0 * (1.0 + 0.45 * (players.size() - 1))
+		units[boss].wave_power = 1.35
 		units[boss].max_hp = units[boss].hp
 	announce("第 %d 波 ／ %sから敵襲！" % [wave, approach.direction])
 
@@ -498,12 +545,16 @@ func _strike(u: Dictionary, target: Dictionary, delta: float, building: bool = f
 	elif u.cool <= 0.0:
 		var damage = float(UNIT_DATA[u.kind].damage) * (1.25 if u.owner != 0 and upgrades.weapons else 1.0)
 		damage *= 1.0 + 0.15 * players.get(u.owner, {}).get("skills", {}).get("power", 0)
+		damage *= u.get("wave_power",1.0)
 		target.hp -= damage
 		u.attack_at = elapsed
 		effect("arrow" if u.kind in ["archer", "slinger"] else "hit", u.p, target.p, u.owner == 0, damage)
 		u.cool = 0.85 if u.kind != "brute" else 1.4
 
 func _step_enemy(u: Dictionary, delta: float) -> void:
+	if u.get("guard",false):
+		_step_guard(u,delta)
+		return
 	var victim = _nearest_enemy(u.p, 9.0, false)
 	if victim != -1:
 		_strike(u, units[victim], delta)
@@ -517,6 +568,22 @@ func _step_enemy(u: Dictionary, delta: float) -> void:
 			target = b
 	if not target.is_empty():
 		_strike(u, target, delta, true)
+
+func _step_guard(u: Dictionary, delta: float) -> void:
+	var home: Vector2 = u.home
+	if u.p.distance_to(home) > 11.0:
+		_move(u,home,delta)
+		return
+	var victim = _nearest_enemy(u.p,9.0,false)
+	if victim != -1 and units[victim].p.distance_to(home) < 12.0:
+		_strike(u,units[victim],delta)
+		return
+	for b in buildings.values():
+		if b.p.distance_to(home) < 9.0:
+			_strike(u,b,delta,true)
+			return
+	if u.p.distance_to(home)>6.8:
+		_move(u,home,delta)
 
 func _step_ally(u: Dictionary, delta: float) -> void:
 	if u.order == "gather":
@@ -645,7 +712,7 @@ func _nearby(pos: Vector2, radius: float) -> Array:
 
 func snapshot() -> Dictionary:
 	return {"units": units.duplicate(true), "buildings": buildings.duplicate(true),
-		"resources": resources.duplicate(true), "players": players.duplicate(true),
+		"resources": resources.duplicate(true), "camps": camps.duplicate(true), "players": players.duplicate(true),
 		"stock": stock.duplicate(), "elapsed": elapsed, "wave": wave,
 		"next_wave": next_wave, "running": running, "result": result,
 		"event_text": event_text, "event_serial": event_serial, "tick": tick,
@@ -657,6 +724,7 @@ func apply_snapshot(state: Dictionary) -> void:
 	units = state.units
 	buildings = state.buildings
 	resources = state.resources
+	camps = state.get("camps",{})
 	players = state.players
 	for player in players.values():
 		if not player.has("skills"):

@@ -184,7 +184,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.4.0     —     盾と騎兵", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.4.1     —     盾と騎兵", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -192,7 +192,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.4.0", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.4.1", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -287,7 +287,7 @@ func _make_lobby() -> void:
 func _make_help() -> void:
 	help_panel = _panel(root, Rect2(230, 87, 692, 535), Color(0.05, 0.12, 0.10, 0.99))
 	_label(help_panel, "指 揮 官 の 手 引 き", Vector2(28, 23), 24, GOLD)
-	_label(help_panel, "左クリック / ドラッグ     自分の部隊を選択（Shiftで追加）\nダブルクリック                画面内の同じ兵種をまとめて選択\n右クリック                        移動 / 敵を攻撃 / 村人で資源を採集\nWASD / 矢印 / 中ボタン     カメラ移動\nホイール / Space              拡大縮小 / 中央砦へ戻る\n1 / 2 / 3 / 4 / C                  村人 / 剣士 / 弓兵 / 騎兵 / 取消\nB / N / T                              家 / 兵舎 / 監視塔を設置\nE / X / Y                               進軍攻撃 / 停止 / 新兵の集合地点\nF / V / Z                               全兵士 / 全村人 / 待機村人\nU / L / R                               武器強化 / 建物強化 / 砦の修復\nCtrl+6〜9 → 6〜9                部隊グループ登録 → 呼び出し\nP / F9 / M                            一時停止 / セーブ（ソロ） / 消音", Vector2(29, 80), 13)
+	_label(help_panel, "左クリック / ドラッグ     自分の部隊を選択（Shiftで追加）\nダブルクリック                画面内の同じ兵種をまとめて選択\n右クリック                        移動 / 敵を攻撃 / 村人で資源を採集\nWASD / 矢印 / 中ボタン     カメラ移動\nホイール / Space              拡大縮小 / 中央砦へ戻る\n1 / 2 / 3 / 4 / C                  村人 / 剣士 / 弓兵 / 騎兵 / 取消\nB / N / T                              家 / 兵舎 / 監視塔を設置\nE / X / Y                               進軍攻撃 / 停止 / 新兵の集合地点\nF / V / Z                               全兵士 / 全村人 / 待機村人\nU / L / R                               武器強化 / 建物強化 / 砦の修復\nCtrl+6〜9 → 6〜9                部隊グループ登録 → 呼び出し\nP / F9 / M / F11                    一時停止 / セーブ / 消音 / 全画面", Vector2(29, 80), 13)
 	_label(help_panel, "最初はVで村人を選び、木・畑・金鉱を右クリック。\n6波目の敵と指揮官を倒せば勝利。中央砦が壊れると全員敗北。\nソロはこの画面で一時停止。オンライン中は時間が進みます。", Vector2(29, 397), 12, MUTED)
 	_button(help_panel, "戦場へ戻る", Rect2(29, 477, 307, 38), toggle_help, true)
 	_button(help_panel, "タイトルへ戻る（退出）", Rect2(350, 477, 313, 38), func(): help_panel.hide(); paused_by_help = false; Session.back_to_menu())

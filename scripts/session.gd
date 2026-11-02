@@ -7,7 +7,7 @@ signal pinged(pos: Vector2)
 
 const Simulation = preload("res://scripts/simulation.gd")
 const PORT = 27840
-const VERSION = "1.4.0"
+const VERSION = "1.4.0" # Protocol/save version; layout-only v1.4.1 is compatible.
 const SAVE_PATH = "user://emberwatch-v14.save"
 const SAVE_MAGIC = "EMBERWATCH_SAVE_1"
 var sim = Simulation.new()

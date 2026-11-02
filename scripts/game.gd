@@ -3,6 +3,7 @@ extends Node3D
 const Visuals = preload("res://scripts/visuals.gd")
 const HUD = preload("res://scripts/hud.gd")
 const Sound = preload("res://scripts/sound.gd")
+const WindowLayout = preload("res://scripts/window_layout.gd")
 const TEAM = Visuals.TEAM
 var art = Visuals.new()
 var camera: Camera3D
@@ -37,6 +38,7 @@ var sun_light: DirectionalLight3D
 var high_quality = true
 
 func _ready() -> void:
+	WindowLayout.fit(get_tree().root)
 	_setup_world()
 	sound = Sound.new()
 	add_child(sound)
@@ -385,7 +387,18 @@ func toggle_quality() -> void:
 	if hud != null:
 		hud.toast("画質：高品質" if high_quality else "画質：標準")
 
+func toggle_fullscreen() -> void:
+	var window = get_tree().root
+	if window.mode in [Window.MODE_FULLSCREEN,Window.MODE_EXCLUSIVE_FULLSCREEN]:
+		window.mode=Window.MODE_WINDOWED
+		WindowLayout.fit.call_deferred(window)
+	else:
+		window.mode=Window.MODE_FULLSCREEN
+
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode==KEY_F11:
+		toggle_fullscreen()
+		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
 		toggle_quality()
 		return

@@ -1,6 +1,7 @@
 extends RefCounted
 ## The host alone advances this simulation. Clients only submit intents.
 
+const Heroes = preload("res://scripts/heroes.gd")
 const Terrain = preload("res://scripts/terrain_data.gd")
 const MAP_HALF = Terrain.HALF
 const WAVE_COUNT = 6
@@ -31,6 +32,14 @@ const UNIT_DATA = {
 	"raider": {"hp": 85.0, "speed": 2.3, "range": 1.7, "damage": 10.0, "cost": {}},
 	"brute": {"hp": 270.0, "speed": 1.6, "range": 2.2, "damage": 23.0, "cost": {}},
 	"slinger": {"hp": 60.0, "speed": 2.1, "range": 6.0, "damage": 9.0, "cost": {}},
+	"heavy_cavalry": {"hp":180.0,"speed":4.0,"range":1.9,"damage":23.0,"armor":0.35,"cost":{"food":110,"gold":70}},
+	"mage": {"hp":55.0,"speed":2.1,"range":8.0,"damage":28.0,"armor":0.0,"cost":{"wood":45,"gold":25}},
+	"arthur": {"hp":340.0,"speed":2.9,"range":1.8,"damage":30.0,"armor":0.50,"cost":{}},
+	"joan": {"hp":360.0,"speed":2.8,"range":1.8,"damage":17.0,"armor":0.55,"cost":{}},
+	"iskandar": {"hp":360.0,"speed":4.0,"range":2.0,"damage":32.0,"armor":0.42,"cost":{}},
+	"kenshin": {"hp":260.0,"speed":5.3,"range":2.0,"damage":32.0,"armor":0.25,"cost":{}},
+	"yoichi": {"hp":180.0,"speed":2.7,"range":13.0,"damage":25.0,"armor":0.10,"cost":{}},
+	"himiko": {"hp":160.0,"speed":2.0,"range":10.0,"damage":46.0,"armor":0.0,"cost":{}},
 	"warlord": {"hp": 650.0, "speed": 1.9, "range": 2.8, "damage": 29.0, "cost": {}},
 }
 const BUILD_DATA = {
@@ -68,6 +77,7 @@ var navigation = Navigation.new()
 var paths: Dictionary = {}
 var spatial: Dictionary = {}
 var match_id = 0
+var hero_selection_required = false
 
 func reset() -> void:
 	match_id = Time.get_ticks_usec()
@@ -169,7 +179,7 @@ func add_player(peer_id: int) -> void:
 		occupied.append(player.slot)
 	while slot in occupied:
 		slot += 1
-	players[peer_id] = {"slot": slot, "name": "盟友 %d" % (slot + 1), "skill_points": cleared_wave, "skills": {"harvest": 0, "power": 0, "vitality": 0}}
+	players[peer_id] = {"slot": slot, "name": "盟友 %d" % (slot + 1), "skill_points": cleared_wave, "skills": {"harvest": 0, "power": 0, "vitality": 0}, "hero":"", "hero_unit":-1, "hero_xp":0, "hero_level":1, "revive_wave":-1}
 	var base = Vector2(-5, 6).rotated(float(slot) * TAU / 4.0)
 	for i in range(3):
 		spawn_unit("worker", base + Vector2(i * 1.3, 0), peer_id)
@@ -182,6 +192,9 @@ func add_player(peer_id: int) -> void:
 		stock.gold += 90
 
 func remove_player(peer_id: int) -> void:
+	var hero_id = int(players.get(peer_id,{}).get("hero_unit",-1))
+	units.erase(hero_id)
+	paths.erase(hero_id)
 	players.erase(peer_id)
 	# Transfer an absent ally's army to the host so the shared defense can continue.
 	for unit in units.values():
@@ -197,6 +210,7 @@ func remove_player(peer_id: int) -> void:
 
 func spawn_unit(kind: String, pos: Vector2, owner: int) -> int:
 	var id = _id()
+	kind = production_kind(owner,kind)
 	var data: Dictionary = UNIT_DATA[kind]
 	var hp: float = data.hp * ([0.78, 1.0, 1.25][difficulty] if owner == 0 else 1.0)
 	if owner != 0:
@@ -217,7 +231,7 @@ func _spawn_building(kind: String, pos: Vector2, owner: int, complete: bool) -> 
 func population() -> int:
 	var count = 0
 	for unit in units.values():
-		if unit.owner != 0:
+		if unit.owner != 0 and not Heroes.is_hero(unit.kind):
 			count += 1
 	return count
 
@@ -275,6 +289,10 @@ func valid_site(kind: String, pos: Vector2) -> bool:
 	return true
 
 func command(sender: int, action: String, ids: Array, pos: Vector2, extra: String = "") -> String:
+	if action == "hero":
+		return choose_hero(sender,extra)
+	if hero_selection_required and players.has(sender) and players[sender].get("hero","")=="":
+		return "最初に英雄を選択してください。"
 	if not running or result != "" or not players.has(sender):
 		return "戦闘が始まっていません。"
 	if not pos.is_finite() or ids.size() > 120:
@@ -368,7 +386,7 @@ func command(sender: int, action: String, ids: Array, pos: Vector2, extra: Strin
 			if extra == "vitality":
 				for u in units.values():
 					if u.owner == sender:
-						var bonus = float(UNIT_DATA[u.kind].hp) * 0.2
+						var bonus = float(UNIT_DATA[u.kind].hp) * (1.0+0.08*(players[sender].get("hero_level",1)-1) if Heroes.is_hero(u.kind) else 1.0) * 0.2
 						u.max_hp += bonus
 						u.hp = minf(u.max_hp, u.hp + bonus)
 			announce(players[sender].name + "：" + SKILLS[extra].name + "を獲得！")
@@ -414,6 +432,8 @@ func effect(kind: String, from: Vector2, to: Vector2, hostile: bool = false, amo
 func step(delta: float) -> void:
 	if not running or paused or result != "":
 		return
+	if hero_selection_required and players.size()==1 and not heroes_ready():
+		return
 	if players.size() == 1 and wave < WAVE_COUNT and enemies_left() == 0 and players.values()[0].get("skill_points", 0) > 0:
 		return
 	tick += 1
@@ -443,7 +463,7 @@ func step(delta: float) -> void:
 			var victim = _nearest_enemy(b.p, 11.0, true)
 			if victim != -1:
 				var damage = 27.0 * (1.25 if upgrades.weapons else 1.0)
-				damage = deal_damage(units[victim],damage)
+				damage = deal_damage(units[victim],damage,int(b.owner))
 				effect("arrow", b.p, units[victim].p, false, damage)
 				b.cool = 1.1
 	var unit_ids = units.keys()
@@ -460,6 +480,7 @@ func step(delta: float) -> void:
 		else:
 			_heal_near_hall(u,delta)
 			_step_ally(u, delta)
+	_heal_hero_auras(delta)
 	for id in unit_ids:
 		if units.has(id) and units[id].hp <= 0:
 			effect("death", units[id].p, units[id].p, units[id].owner == 0)
@@ -468,6 +489,10 @@ func step(delta: float) -> void:
 				stats.kills += 1
 			else:
 				stats.lost += 1
+				if Heroes.is_hero(units[id].kind) and players.has(units[id].owner):
+					var player: Dictionary=players[units[id].owner]
+					player.hero_unit=-1
+					player.revive_wave=maxi(1,wave if wave>cleared_wave else wave+1)
 			units.erase(id)
 			paths.erase(id)
 	for id in buildings.keys():
@@ -480,6 +505,7 @@ func step(delta: float) -> void:
 	if wave > cleared_wave and enemies_left() == 0:
 		var rewards = wave - cleared_wave
 		cleared_wave = wave
+		_revive_heroes()
 		next_wave = elapsed + PREPARATION_TIME
 		for player in players.values():
 			player.skill_points = player.get("skill_points", 0) + rewards
@@ -542,27 +568,39 @@ func _nearest_enemy(pos: Vector2, radius: float, hostile: bool) -> int:
 	return nearest
 
 func _strike(u: Dictionary, target: Dictionary, delta: float, building: bool = false) -> void:
-	var reach: float = UNIT_DATA[u.kind].range
+	var data = unit_stats(u)
+	var reach: float = data.range
 	if building:
 		reach += float(BUILD_DATA[target.kind].radius)
 	if u.p.distance_to(target.p) > reach:
 		_move(u, target.p, delta)
 	elif u.cool <= 0.0:
-		var damage = float(UNIT_DATA[u.kind].damage) * (1.25 if u.owner != 0 and upgrades.weapons else 1.0)
+		var damage = float(data.damage) * (1.25 if u.owner != 0 and upgrades.weapons else 1.0)
 		damage *= 1.0 + 0.15 * players.get(u.owner, {}).get("skills", {}).get("power", 0)
 		damage *= u.get("wave_power",1.0)
-		damage = deal_damage(target,damage)
+		var raw_damage = damage
+		damage = deal_damage(target,damage,int(u.owner))
+		if u.kind=="arthur" and players.get(u.owner,{}).get("hero_level",1)>=3 and u.hp>0:
+			u.hp=minf(u.max_hp,u.hp+damage*0.2)
+		var level = int(players.get(u.owner,{}).get("hero_level",1))
+		if not building and (u.kind=="himiko" and level>=3 or u.kind=="mage" and level>=5):
+			var radius = 2.4 if u.kind=="himiko" else 1.8
+			for other in units.values():
+				if other.owner==0 and other.id!=target.id and other.hp>0 and other.p.distance_to(target.p)<=radius:
+					deal_damage(other,raw_damage*(0.35 if u.kind=="himiko" else 0.25),int(u.owner))
 		u.attack_at = elapsed
-		effect("arrow" if u.kind in ["archer", "slinger"] else "hit", u.p, target.p, u.owner == 0, damage)
-		u.cool = 0.85 if u.kind != "brute" else 1.4
+		effect("fire" if Heroes.role(u.kind)=="mage" else "arrow" if Heroes.role(u.kind) in ["archer", "slinger"] else "hit", u.p, target.p, u.owner == 0, damage)
+		u.cool = 1.35 if u.kind=="mage" else 1.25 if u.kind=="himiko" else 0.65 if u.kind=="kenshin" and level>=3 else 0.85 if u.kind!="brute" else 1.4
 
-func deal_damage(target: Dictionary, amount: float) -> float:
-	var armor = float(UNIT_DATA.get(target.kind,{}).get("armor",0.0))
+func deal_damage(target: Dictionary, amount: float, source_owner: int = 0) -> float:
+	var armor = float(unit_stats(target).get("armor",0.0)) if units.has(target.id) else 0.0
 	var damage = maxf(0.0,amount) * (1.0 - clampf(armor,0.0,0.85))
 	var dealt = minf(maxf(0.0,target.hp),damage)
 	target.hp -= dealt
 	target.last_hit_at = elapsed
 	target.healing = false
+	if dealt>0 and target.hp<=0 and target.get("owner",-1)==0 and units.has(target.id) and players.has(source_owner):
+		_award_hero_xp(source_owner,{"raider":15,"slinger":15,"brute":45,"warlord":240}.get(target.kind,15))
 	return dealt
 
 func _heal_near_hall(u: Dictionary, delta: float) -> void:
@@ -660,7 +698,7 @@ func _step_ally(u: Dictionary, delta: float) -> void:
 	if u.order == "attack" and units.has(u.enemy) and units[u.enemy].hp > 0:
 		_strike(u, units[u.enemy], delta)
 		return
-	var radius = 10.0 if u.kind != "worker" else 2.5
+	var radius = maxf(10.0,float(unit_stats(u).range)) if u.kind!="worker" else 2.5
 	var victim = _nearest_enemy(u.p, radius, true)
 	if victim != -1:
 		_strike(u, units[victim], delta)
@@ -715,7 +753,7 @@ func _move(u: Dictionary, target: Vector2, delta: float) -> bool:
 				tangent = -tangent
 			repel += normal * maxf(0, radius - dist) * 3.0 + tangent * (1.0 - maxf(0, normal.dot(dir)))
 	dir = (dir + repel).normalized()
-	var proposed: Vector2 = u.p + dir * minf(diff.length(), float(UNIT_DATA[u.kind].speed) * delta)
+	var proposed: Vector2 = u.p + dir * minf(diff.length(), float(unit_stats(u).speed) * delta)
 	if not Terrain.crosses(u.p, proposed):
 		u.p = proposed
 	u.p = Vector2(clampf(u.p.x, -57.5, 57.5), clampf(u.p.y, -57.5, 57.5))
@@ -742,9 +780,10 @@ func snapshot() -> Dictionary:
 		"event_text": event_text, "event_serial": event_serial, "tick": tick,
 		"difficulty": difficulty, "paused": paused, "upgrades": upgrades.duplicate(),
 		"stats": stats.duplicate(), "events": events.duplicate(true), "effect_serial": effect_serial,
-		"cleared_wave": cleared_wave, "rally": rally, "next_id": next_id, "rng_state": rng.state, "match_id": match_id}
+		"cleared_wave": cleared_wave, "rally": rally, "next_id": next_id, "rng_state": rng.state, "match_id": match_id, "hero_selection_required":hero_selection_required}
 
 func apply_snapshot(state: Dictionary) -> void:
+	hero_selection_required=state.get("hero_selection_required",false)
 	units = state.units
 	buildings = state.buildings
 	resources = state.resources
@@ -777,3 +816,136 @@ func apply_snapshot(state: Dictionary) -> void:
 	paths.clear()
 	spatial.clear()
 	navigation.signature = ""
+
+
+func heroes_ready() -> bool:
+	if players.is_empty():
+		return false
+	for player in players.values():
+		if player.get("hero","")=="":
+			return false
+	return true
+
+func hero_owner(key: String) -> int:
+	for id in players:
+		if players[id].get("hero","")==key:
+			return id
+	return -1
+
+func choose_hero(owner: int, key: String) -> String:
+	if not players.has(owner) or result!="" or not Heroes.DATA.has(key):
+		return "無効な英雄です。"
+	if players[owner].get("hero","")!="":
+		return "英雄はすでに確定しています。"
+	if hero_owner(key)!=-1:
+		return "その英雄は盟友が選択済みです。別の英雄を選んでください。"
+	var player: Dictionary=players[owner]
+	player.hero=key
+	player.hero_xp=0
+	player.hero_level=1
+	player.revive_wave=-1
+	for u in units.values():
+		if u.owner==owner:
+			var new_kind=production_kind(owner,u.kind)
+			if new_kind!=u.kind:
+				var ratio: float=u.hp/u.max_hp
+				u.kind=new_kind
+				u.max_hp=UNIT_DATA[new_kind].hp*(1.0+0.2*player.skills.vitality)
+				u.hp=u.max_hp*ratio
+	_spawn_hero(owner)
+	announce(player.name+"："+Heroes.DATA[key].name+"が参戦！")
+	return ""
+
+func production_kind(owner: int, kind: String) -> String:
+	var hero: String=players.get(owner,{}).get("hero","")
+	return "heavy_cavalry" if hero=="iskandar" and kind=="cavalry" else "mage" if hero=="himiko" and kind=="archer" else kind
+
+func _spawn_hero(owner: int) -> void:
+	var player: Dictionary=players[owner]
+	var pos=Vector2(-5,4).rotated(float(player.slot)*TAU/4.0)
+	var id=spawn_unit(player.hero,pos,owner)
+	var u: Dictionary=units[id]
+	u.max_hp*=1.0+0.08*(int(player.hero_level)-1)
+	u.hp=u.max_hp
+	player.hero_unit=id
+	player.revive_wave=-1
+	effect("spawn",pos,pos)
+
+func _revive_heroes() -> void:
+	if not buildings.has(1) or buildings[1].hp<=0:
+		return
+	for owner in players:
+		var player: Dictionary=players[owner]
+		if player.get("hero","")!="" and player.get("hero_unit",-1)==-1 and player.get("revive_wave",-1)>0 and player.revive_wave<=cleared_wave:
+			_spawn_hero(owner)
+
+func _award_hero_xp(owner: int, amount: int) -> void:
+	var player: Dictionary=players[owner]
+	if player.get("hero","")=="":
+		return
+	player.hero_xp=mini(Heroes.XP[-1],player.get("hero_xp",0)+amount)
+	var old_level=int(player.get("hero_level",1))
+	var level=old_level
+	while level<Heroes.XP.size() and player.hero_xp>=Heroes.next_xp(level):
+		level+=1
+	player.hero_level=level
+	if level==old_level:
+		return
+	var hero: Dictionary=units.get(player.hero_unit,{})
+	if not hero.is_empty() and hero.hp>0:
+		var bonus: float=UNIT_DATA[player.hero].hp*(1.0+0.2*player.skills.vitality)*0.08*(level-old_level)
+		hero.max_hp+=bonus
+		hero.hp=minf(hero.max_hp,hero.hp+bonus)
+		effect("level",hero.p,hero.p)
+	announce(Heroes.DATA[player.hero].name+"がLv%dに成長！" % level)
+
+func unit_stats(u: Dictionary) -> Dictionary:
+	var data: Dictionary=UNIT_DATA.get(u.kind,{}).duplicate(true)
+	if data.is_empty() or u.get("owner",0)==0:
+		return data
+	var player: Dictionary=players.get(u.owner,{})
+	var hero: String=player.get("hero","")
+	var level=int(player.get("hero_level",1))
+	var special=Heroes.is_hero(u.kind)
+	if special:
+		data.damage*=1.0+0.1*(level-1)
+	else:
+		if hero=="arthur" and u.kind=="soldier":
+			data.damage*=1.2+0.04*(level-1)
+			if level>=5: data.armor+=0.10
+		if hero=="joan" and u.kind=="soldier":
+			data.armor+=0.08+0.01*(level-1)
+		if hero=="iskandar" and u.kind=="heavy_cavalry":
+			if level>=3: data.armor+=0.08
+			if level>=5: data.damage*=1.25
+		if hero=="kenshin" and Heroes.role(u.kind)=="cavalry":
+			data.damage*=1.15+0.03*(level-1)
+			data.speed*=1.12+0.02*(level-1)
+			if level>=5: data.armor+=0.08
+		if hero=="yoichi" and u.kind=="archer":
+			data.range+=2.0+0.4*(level-1)
+			if level>=5: data.damage*=1.15
+	if u.kind=="yoichi" and level>=3: data.damage*=1.3
+	return data
+
+func _heal_hero_auras(delta: float) -> void:
+	for owner in players:
+		var player: Dictionary=players[owner]
+		if player.get("hero","")!="joan":
+			continue
+		var hero: Dictionary=units.get(player.get("hero_unit",-1),{})
+		if hero.is_empty() or hero.hp<=0:
+			continue
+		var level=int(player.hero_level)
+		var radius=10.0 if level>=3 else 7.0
+		for u in units.values():
+			if u.owner==0 or u.hp<=0 or u.hp>=u.max_hp:
+				continue
+			var rate=0.0
+			if hero.p.distance_to(u.p)<=radius:
+				rate=2.0+0.5*(level-1)
+			if level>=5 and u.owner==owner and u.kind=="soldier":
+				rate+=1.0
+			if rate>0:
+				u.hp=minf(u.max_hp,u.hp+rate*delta)
+				u.healing=true

@@ -7,8 +7,8 @@ signal pinged(pos: Vector2)
 
 const Simulation = preload("res://scripts/simulation.gd")
 const PORT = 27840
-const VERSION = "1.4.0" # Protocol/save version; layout-only v1.4.1 is compatible.
-const SAVE_PATH = "user://emberwatch-v14.save"
+const VERSION = "1.5.0"
+const SAVE_PATH = "user://emberwatch-v15.save"
 const SAVE_MAGIC = "EMBERWATCH_SAVE_1"
 var sim = Simulation.new()
 var mode = "menu"
@@ -75,6 +75,7 @@ func solo(level: int = -1) -> void:
 	sim.next_wave = Simulation.PREPARATION_TIME
 	saved_wave = 0
 	mode = "solo"
+	sim.hero_selection_required = true
 	sim.running = true
 	changed.emit()
 
@@ -90,6 +91,7 @@ func host(level: int = -1) -> void:
 		changed.emit()
 		return
 	multiplayer.multiplayer_peer = peer
+	sim.hero_selection_required = true
 	mode = "host"
 	status = "盟友を待っています。1人でも出陣できます。"
 	changed.emit()
@@ -110,6 +112,10 @@ func join(address: String) -> void:
 
 func start() -> void:
 	if mode == "host" and sim.result == "":
+		if not sim.heroes_ready():
+			status = "全員が英雄を確定してから出陣してください。"
+			changed.emit()
+			return
 		sim.running = true
 		status = ""
 		_welcome.rpc(_snapshot())
@@ -261,6 +267,10 @@ func _execute(sender: int, action: String, ids: Array, pos: Vector2, extra: Stri
 			message.emit(error)
 		else:
 			_feedback.rpc_id(sender, error)
+	elif action == "hero":
+		changed.emit()
+		if mode=="host":
+			_welcome.rpc(_snapshot())
 	elif action == "ping":
 		pinged.emit(pos)
 		if mode == "host":
@@ -283,7 +293,8 @@ func rematch() -> void:
 		sim.add_player(id)
 	sim.next_wave = Simulation.PREPARATION_TIME
 	saved_wave = 0
-	sim.running = true
+	sim.hero_selection_required = true
+	sim.running = mode=="solo"
 	if mode == "host":
 		_welcome.rpc(_snapshot())
 	changed.emit()

@@ -20,6 +20,7 @@ func run() -> void:
 	if existed:
 		original = FileAccess.get_file_as_bytes(path)
 	session.solo(2)
+	session.issue("hero",[],Vector2.ZERO,"arthur")
 	session.sim.stock.food = 432
 	session.sim.elapsed = 121.5
 	session.sim.wave = 2

@@ -29,8 +29,10 @@ func _process(delta: float) -> bool:
 		push_error("LIFECYCLE_TIMEOUT " + role)
 		quit(1)
 		return false
+	if session.mode in ["host","client"] and session.sim.players.has(session.local_id) and session.sim.players[session.local_id].get("hero","")=="":
+		session.issue("hero",[],Vector2.ZERO,"arthur" if role=="host" else "joan" if role=="early" else "himiko")
 	if role == "host":
-		if phase == 0 and session.sim.players.size() >= 2:
+		if phase == 0 and session.sim.players.size() >= 2 and session.sim.heroes_ready():
 			session.start()
 			session.sim.buildings[1].hp = 1200
 			phase = 1
@@ -44,6 +46,8 @@ func _process(delta: float) -> bool:
 			session.sim.running = false
 			session.rematch()
 			phase = 2
+		if phase==2 and session.sim.heroes_ready() and not session.sim.running:
+			session.start()
 		if phase == 2 and clock > 9:
 			passed = session.sim.players.size() == 2 and session.sim.running
 			for u in session.sim.units.values():

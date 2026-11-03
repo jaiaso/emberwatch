@@ -1,4 +1,5 @@
 extends Control
+const Heroes=preload("res://scripts/heroes.gd")
 
 signal navigated(pos: Vector2)
 var sim
@@ -33,6 +34,10 @@ func _draw() -> void:
 	for b in sim.buildings.values():
 		draw_rect(Rect2(_point(b.p) - Vector2(3, 3), Vector2(6, 6)), Color("d8c89d"))
 	for u in sim.units.values():
+		if Heroes.is_hero(u.kind):
+			var p=_point(u.p)
+			draw_colored_polygon(PackedVector2Array([p+Vector2(0,-3.5),p+Vector2(3.5,0),p+Vector2(0,3.5),p+Vector2(-3.5,0)]),Color("ffe092"))
+			continue
 		var color = Color("f4a04c") if u.get("guard",false) else Color("df765e") if u.owner == 0 else Color("94cfb6")
 		draw_circle(_point(u.p), 1.5 if u.owner else 2.0, color)
 	var incoming: Dictionary = sim.incoming_attack()

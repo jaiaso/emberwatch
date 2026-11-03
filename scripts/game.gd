@@ -1,5 +1,6 @@
 extends Node3D
 
+const Heroes = preload("res://scripts/heroes.gd")
 const Visuals = preload("res://scripts/visuals.gd")
 const HUD = preload("res://scripts/hud.gd")
 const Sound = preload("res://scripts/sound.gd")
@@ -285,9 +286,10 @@ func _sync_models(delta: float) -> void:
 			model.position = Vector3(unit.p.x, 0, unit.p.y)
 			entities[unit.id] = model
 			model.set_meta("owner", unit.owner)
+			model.set_meta("kind",unit.kind)
 		else:
 			model = entities[unit.id]
-			if model.get_meta("owner", -1) != unit.owner:
+			if model.get_meta("owner", -1) != unit.owner or model.get_meta("kind","")!=unit.kind:
 				model.queue_free()
 				entities.erase(unit.id)
 				continue
@@ -299,7 +301,7 @@ func _sync_models(delta: float) -> void:
 			var direction = goal - old
 			model.rotation.y = lerp_angle(model.rotation.y, atan2(-direction.x, -direction.z), minf(1.0, delta * 12.0))
 		var body: Node3D = model.get_node("Body")
-		body.position.y = (0.90 if unit.kind=="cavalry" else 0.0) + (absf(sin(float(unit.anim) * 9.0)) * 0.07 if moved > 0.02 else 0.0)
+		body.position.y = (0.90 if Heroes.mounted(unit.kind) else 0.0) + (absf(sin(float(unit.anim) * 9.0)) * 0.07 if moved > 0.02 else 0.0)
 		body.rotation.z = sin(float(unit.anim) * 16.0) * 0.12 if unit.order in ["gather", "construct"] and moved < 0.03 else 0.0
 		var swing: float = clampf((sim.elapsed - unit.get("attack_at", -10.0)) / 0.3, 0, 1)
 		body.rotation.x = sin(swing * PI) * 0.4
@@ -310,7 +312,7 @@ func _sync_models(delta: float) -> void:
 		body.get_node("ArmR").rotation.x = stride * 0.7 - sin(swing*PI)*1.4
 		if unit.order in ["gather","construct"] and moved < 0.03:
 			body.get_node("ArmR").rotation.x = -0.8 + sin(float(unit.anim)*6.0)*0.65
-		if unit.kind == "cavalry":
+		if Heroes.mounted(unit.kind):
 			body.get_node("LegL").rotation = Vector3(-0.7,0,-0.25)
 			body.get_node("LegR").rotation = Vector3(-0.7,0,0.25)
 			for leg_index in range(4):
@@ -346,7 +348,7 @@ func _pick_unit(screen: Vector2, enemy: bool = false) -> int:
 			continue
 		if not enemy and u.owner != Session.local_id:
 			continue
-		var pos = camera.unproject_position(Vector3(u.p.x, 1.6 if u.kind=="cavalry" else 0.9, u.p.y))
+		var pos = camera.unproject_position(Vector3(u.p.x, 1.6 if Heroes.mounted(u.kind) else 0.9, u.p.y))
 		var d = pos.distance_to(screen)
 		if d < distance:
 			distance = d
@@ -405,6 +407,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_M:
 		sound.toggle()
 		return
+	if hud.hero_picker.visible:
+		return
 	if not Session.sim.running or Session.mode == "menu":
 		return
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -457,6 +461,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				selected = groups.get(slot, []).filter(func(id): return Session.sim.units.has(id) and Session.sim.units[id].owner == Session.local_id)
 			return
 		match event.keycode:
+			KEY_Q: focus_hero()
 			KEY_1: Session.issue("train", [], Vector2.ZERO, "worker")
 			KEY_2: Session.issue("train", [], Vector2.ZERO, "soldier")
 			KEY_3: Session.issue("train", [], Vector2.ZERO, "archer")
@@ -555,7 +560,15 @@ func _draw_overlay() -> void:
 			continue
 		var color = Color("ef9c72") if visual.hostile else Color("f4df9b")
 		color.a = minf(1, visual.life * 4)
-		if visual.kind == "arrow":
+		if visual.kind == "fire":
+			var t=minf(progress*1.6,1.0)
+			var point=start.lerp(end,t)+Vector2(0,-sin(t*PI)*18)
+			overlay.draw_line(point,point-(end-start).normalized()*18,Color(1,0.25,0.05,color.a*0.6),7)
+			overlay.draw_circle(point,5.5,Color(1,0.43,0.10,color.a))
+			overlay.draw_circle(point,2.6,Color(1,0.92,0.54,color.a))
+			if t>=1.0:
+				overlay.draw_arc(end,5+progress*18,0,TAU,24,Color(1,0.5,0.1,color.a),2)
+		elif visual.kind == "arrow":
 			var point = start.lerp(end, minf(progress * 1.5, 1)) + Vector2(0, -sin(minf(progress * 1.5, 1) * PI) * 20)
 			overlay.draw_line(point, point - (end - start).normalized() * 8, color, 2)
 		elif visual.kind == "hit":
@@ -593,21 +606,29 @@ func _draw_overlay() -> void:
 			overlay.draw_style_box(hud._style(Color("142a24"),Color("b5a765")),Rect2(rp-Vector2(width/2,15),Vector2(width,22)))
 			overlay.draw_string(font,rp+Vector2(-width/2+7,0),text,HORIZONTAL_ALIGNMENT_LEFT,-1,11,Color("ffc17a") if guards>0 else Color("ffe092"))
 	for u in Session.sim.units.values():
+		if u.kind=="joan" and u.id in selected and u.hp>0:
+			var aura=PackedVector2Array()
+			var radius=10.0 if Session.sim.players.get(u.owner,{}).get("hero_level",1)>=3 else 7.0
+			for index in range(65):
+				var p: Vector2=u.p+Vector2(cos(index*TAU/64),sin(index*TAU/64))*radius
+				aura.append(camera.unproject_position(Vector3(p.x,0.08,p.y)))
+			overlay.draw_polyline(aura,Color(0.55,0.85,1.0,0.5),1.5)
 		if u.get("guard",false):
 			var marker = camera.unproject_position(Vector3(u.p.x,2.5,u.p.y))
 			if Rect2(0,145,1152,350).has_point(marker):
 				overlay.draw_string(hud.root.get_theme_default_font(),marker+Vector2(-10,0),"守備",HORIZONTAL_ALIGNMENT_LEFT,-1,10,Color("ffb37a"))
 		if u.owner != 0:
-			var marker = camera.unproject_position(Vector3(u.p.x, 3.0 if u.kind=="cavalry" else 2.2, u.p.y))
+			var marker = camera.unproject_position(Vector3(u.p.x, 3.0 if Heroes.mounted(u.kind) else 2.2, u.p.y))
 			if Rect2(0, 145, 1152, 350).has_point(marker):
-				overlay.draw_string(hud.root.get_theme_default_font(), marker + Vector2(-5, -3), {"worker": "農", "soldier": "盾", "archer": "弓", "cavalry": "騎"}.get(u.kind, ""), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, {"worker": Color("ffe092"), "soldier": Color("e7f2ff"), "archer": Color("a2edb1"), "cavalry": Color("f4cd88")}.get(u.kind, Color.WHITE))
+				var text="★ "+Heroes.unit_name(u.kind)+" Lv%d" % Session.sim.players.get(u.owner,{}).get("hero_level",1) if Heroes.is_hero(u.kind) else {"worker":"農","soldier":"盾","archer":"弓","cavalry":"騎","heavy_cavalry":"重騎","mage":"炎"}.get(u.kind,"")
+				overlay.draw_string(hud.root.get_theme_default_font(),marker+Vector2(-5,-3),text,HORIZONTAL_ALIGNMENT_LEFT,-1,11,Color("ffe092") if Heroes.is_hero(u.kind) else Color("dce8d3"))
 		if u.get("healing",false):
-			var heal_pos = camera.unproject_position(Vector3(u.p.x,2.9 if u.kind=="cavalry" else 2.1,u.p.y))
+			var heal_pos = camera.unproject_position(Vector3(u.p.x,2.9 if Heroes.mounted(u.kind) else 2.1,u.p.y))
 			if Rect2(0,145,1152,350).has_point(heal_pos):
 				overlay.draw_string(hud.root.get_theme_default_font(),heal_pos+Vector2(7,-3),"+",HORIZONTAL_ALIGNMENT_LEFT,-1,17,Color("8befb2"))
-		if u.id not in selected and u.hp >= u.max_hp:
+		if u.id not in selected and u.hp >= u.max_hp and not Heroes.is_hero(u.kind):
 			continue
-		var pos = camera.unproject_position(Vector3(u.p.x, 3.0 if u.kind=="cavalry" else 1.9 if u.kind != "brute" else 2.7, u.p.y))
+		var pos = camera.unproject_position(Vector3(u.p.x, 3.0 if Heroes.mounted(u.kind) else 1.9 if u.kind != "brute" else 2.7, u.p.y))
 		_bar(pos, u.hp / u.max_hp, 25.0, Color("bacc88") if u.owner != 0 else Color("d47b61"))
 	for b in Session.sim.buildings.values():
 		if b.hp >= b.max_hp and b.progress >= 1.0 and b.kind != "hall":
@@ -640,6 +661,7 @@ func can_build_at(point: Vector2) -> bool:
 func _showcase() -> void:
 	# A reproducible screenshot scene; normal matches always start with the standard economy.
 	Session.solo()
+	Session.issue("hero",[],Vector2.ZERO,"arthur")
 	Session.allow_autosave = false
 	var sim = Session.sim
 	sim._spawn_building("house", Vector2(-4, 6), 1, true)
@@ -666,3 +688,12 @@ func _showcase() -> void:
 	_select_kind(false)
 	camera_center = Vector2(0, -1)
 	zoom = 30
+
+
+func focus_hero() -> void:
+	var id=int(Session.sim.players.get(Session.local_id,{}).get("hero_unit",-1))
+	if Session.sim.units.has(id):
+		selected=[id]
+		camera_center=Session.sim.units[id].p
+	else:
+		hud.toast("英雄はウェーブ終了後に復活します。")

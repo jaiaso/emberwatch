@@ -43,6 +43,8 @@ func _process(delta: float) -> bool:
 		return false
 	if role == "host":
 		if not sent and session.sim.players.size() == 4:
+			for id in session.sim.players:
+				session.sim.choose_hero(id,["arthur","joan","yoichi","kenshin"][session.sim.players[id].slot])
 			for peer in session.sim.players:
 				var rider=session.sim.spawn_unit("cavalry",Vector2(4,2+session.sim.players[peer].slot*0.3),peer)
 				session.sim.units[rider].hp-=20

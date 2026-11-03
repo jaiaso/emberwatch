@@ -46,6 +46,7 @@ func run() -> void:
 	var session=root.get_node("Session")
 	session.allow_autosave=false
 	session.solo()
+	session.issue("hero",[],Vector2.ZERO,"arthur")
 	check(root.content_scale_aspect==Window.CONTENT_SCALE_ASPECT_KEEP,"keep aspect enabled")
 	if DisplayServer.get_name()!="headless":
 		var usable=DisplayServer.screen_get_usable_rect(root.current_screen)

@@ -1,6 +1,7 @@
 extends RefCounted
 ## Original procedural models, articulated characters and physical surface shading.
 
+const Heroes = preload("res://scripts/heroes.gd")
 const TEAM = [Color("79c5b3"), Color("e6b960"), Color("9ca7e6"), Color("d994b0")]
 var materials: Dictionary = {}
 var sphere_mesh: SphereMesh
@@ -104,6 +105,12 @@ func flag(parent: Node3D, pos: Vector3, color: Color, height: float = 2.4) -> vo
 	cloth.material_override = material
 
 func make_unit(kind: String, team: Color) -> Node3D:
+	if Heroes.is_hero(kind):
+		return make_hero(kind,team)
+	if kind=="heavy_cavalry":
+		var heavy=make_cavalry(team)
+		armor_horse(heavy,Color("8d9ba9"))
+		return heavy
 	if kind == "cavalry":
 		return make_cavalry(team)
 	var root = Node3D.new()
@@ -134,6 +141,13 @@ func make_unit(kind: String, team: Color) -> Node3D:
 		box(body,Vector3(0.32,0.40,0.04),Vector3(0,0.98,-0.18),Color("baa27b"))
 		cylinder(right,0.025,0.025,0.95,Vector3(0,-0.45,-0.12),Color("705036"),12)
 		box(right,Vector3(0.36,0.12,0.12),Vector3(0,-0.03,-0.12),Color("8a969b"))
+	elif kind=="mage":
+		cylinder(body,0.36,0.21,0.86,Vector3(0,0.63,0),Color("693e79"),32)
+		box(body,Vector3(0.45,0.085,0.36),Vector3(0,0.86,0),Color("e4bd66"))
+		cylinder(body,0.20,0.04,0.45,Vector3(0,1.92,0),Color("693e79"),24)
+		cylinder(right,0.028,0.028,1.5,Vector3(0,0.02,-0.20),Color("6b4239"),16)
+		var flame=sphere(right,Vector3(0.24,0.34,0.24),Vector3(0,0.85,-0.20),Color("ff832e"))
+		flame.material_override=mat(Color("ff832e"),true)
 	elif kind in ["archer","slinger"]:
 		sphere(body,Vector3(0.36,0.34,0.34),Vector3(0,1.69,0.045),Color("315d42"))
 		box(body,Vector3(0.39,0.63,0.045),Vector3(0,1.03,0.21),Color("315d42"))
@@ -477,4 +491,110 @@ func make_cavalry(team: Color) -> Node3D:
 	lance.rotation.x = -0.28
 	var selection: MeshInstance3D = root.get_node("Selection")
 	selection.scale = Vector3(1.4,1,1.8)
+	return root
+
+
+func armor_horse(root: Node3D, color: Color) -> void:
+	var mount=root.get_node("Mount")
+	for side in [-1,1]:
+		for row in range(3):
+			for col in range(5):
+				box(mount,Vector3(0.08,0.20,0.28),Vector3(side*0.41,0.80+row*0.18,-0.57+col*0.29),color.darkened(row*0.05))
+	sphere(mount,Vector3(0.46,0.28,0.62),Vector3(0,1.95,-0.86),color)
+	box(mount,Vector3(0.13,0.44,0.10),Vector3(0,1.77,-1.20),color.lightened(0.16))
+	var body=root.get_node("Body")
+	for side in [-1,1]:
+		box(body,Vector3(0.25,0.14,0.31),Vector3(side*0.31,1.27,0),color)
+
+func make_hero(key: String, team: Color) -> Node3D:
+	var color=Color(Heroes.DATA[key].color)
+	var role: String=Heroes.DATA[key].role
+	var root=make_unit(role,color)
+	root.name="Hero_"+key
+	root.set_meta("hero",key)
+	var body=root.get_node("Body")
+	var right=body.get_node("ArmR")
+	body.scale=Vector3.ONE*1.22
+	var gold=Color("e4bd66")
+	# A permanent gold ring identifies heroes even before selecting them.
+	var ring=TorusMesh.new()
+	ring.inner_radius=0.69 if role!="cavalry" else 0.95
+	ring.outer_radius=ring.inner_radius+0.045
+	ring.rings=48
+	ring.ring_segments=8
+	var badge=piece(root,ring,Vector3(0,0.07,0),gold)
+	badge.name="HeroRing"
+	badge.material_override=mat(gold,true)
+	var cape_color=Color("203e8a") if key=="arthur" else Color("eeeee0") if key=="joan" else Color("933d39") if key=="iskandar" else Color("e5e4da") if key=="kenshin" else Color("325d42") if key=="yoichi" else Color("a93659")
+	for i in range(7):
+		var cloth=box(body,Vector3(0.095,0.95,0.04),Vector3(-0.28+i*0.092,0.89,0.24+abs(i-3)*0.015),cape_color)
+		cloth.rotation.x=-0.14
+	if key=="arthur":
+		cylinder(body,0.22,0.22,0.10,Vector3(0,1.91,0),gold,32)
+		for i in range(7):
+			cylinder(body,0.045,0.005,0.22,Vector3(cos(i*TAU/7)*0.20,2.05,sin(i*TAU/7)*0.20),gold,12)
+		var blade=box(right,Vector3(0.11,1.08,0.06),Vector3(0,0.04,-0.25),Color("d2f1ff"))
+		blade.material_override=mat(Color("a9d8fa"),true)
+		box(right,Vector3(0.4,0.08,0.12),Vector3(0,-0.46,-0.25),gold)
+		for side in [-1,1]:
+			sphere(body,Vector3(0.29,0.20,0.31),Vector3(side*0.31,1.28,0),gold)
+		box(body,Vector3(0.12,0.30,0.055),Vector3(0,1.09,-0.21),gold)
+	elif key=="joan":
+		for side in [-1,1]:
+			var hair=sphere(body,Vector3(0.12,0.46,0.15),Vector3(side*0.15,1.56,0.06),Color("d2ac62"))
+			hair.rotation.z=side*0.18
+		flag(body,Vector3(-0.42,0,0.25),Color("dce9ed"),2.95)
+		box(body,Vector3(0.08,0.28,0.05),Vector3(-0.14,2.61,0.22),gold)
+		box(body,Vector3(0.25,0.07,0.05),Vector3(-0.14,2.63,0.22),gold)
+		var halo=TorusMesh.new()
+		halo.inner_radius=0.24
+		halo.outer_radius=0.27
+		var light=piece(body,halo,Vector3(0,2.04,0),gold)
+		light.material_override=mat(gold,true)
+	elif key=="iskandar":
+		armor_horse(root,Color("ae8f58"))
+		for side in [-1,1]:
+			var horn=cylinder(body,0.07,0.012,0.42,Vector3(side*0.23,1.94,0.02),gold,16)
+			horn.rotation.z=side*0.65
+		sphere(body,Vector3(0.30,0.28,0.20),Vector3(0,1.44,-0.09),Color("9b5538"))
+		box(body,Vector3(0.48,0.54,0.07),Vector3(0,1.06,-0.20),Color("b89a64"))
+		flag(root,Vector3(0.40,0,0.55),Color("a74737"),3.2)
+	elif key=="kenshin":
+		for row in range(4):
+			for side in [-1,1]:
+				box(body,Vector3(0.22,0.12,0.40),Vector3(side*0.28,1.30-row*0.15,0),Color("313a52"))
+		cylinder(body,0.23,0.14,0.21,Vector3(0,1.88,0),Color("e8e6db"),32)
+		for i in range(11):
+			var angle=-0.95+i*1.9/10
+			var crest=cylinder(body,0.03,0.03,0.12,Vector3(sin(angle)*0.36,2.15-cos(angle)*0.18,-0.09),gold,12)
+			crest.rotation.z=-angle
+		flag(root,Vector3(-0.38,0,0.55),Color("e7e7da"),3.3)
+		box(root,Vector3(0.11,0.36,0.06),Vector3(-0.05,3.0,0.53),Color("333c57"))
+	elif key=="yoichi":
+		cylinder(body,0.22,0.17,0.26,Vector3(0,1.87,0),Color("3c3430"),24)
+		box(body,Vector3(0.46,0.05,0.36),Vector3(0,1.73,0),Color("b8433f"))
+		for row in range(4):
+			box(body,Vector3(0.48,0.10,0.065),Vector3(0,0.86+row*0.12,-0.20),Color("334a49"))
+		for i in range(18):
+			var angle=-1.3+i*2.6/17
+			var bow=cylinder(right,0.035,0.035,0.14,Vector3(0,-0.15+sin(angle)*0.85,-0.22-cos(angle)*0.33),Color("b58251"),16)
+			bow.rotation.x=-angle
+		cylinder(right,0.008,0.008,1.64,Vector3(0,-0.15,-0.31),Color("f1ddad"),8)
+	elif key=="himiko":
+		cylinder(body,0.41,0.23,0.92,Vector3(0,0.65,0),Color("f2dfcf"),40)
+		for side in [-1,1]:
+			box(body,Vector3(0.30,0.52,0.30),Vector3(side*0.35,1.02,0),Color("e8cfbe"))
+			box(body,Vector3(0.10,0.82,0.11),Vector3(side*0.17,1.48,0.12),Color("292335"))
+		cylinder(body,0.22,0.22,0.09,Vector3(0,1.90,0),gold,32)
+		for i in range(9):
+			var angle=i*TAU/9
+			cylinder(body,0.025,0.008,0.34,Vector3(cos(angle)*0.21,2.10,sin(angle)*0.21),gold,12)
+		var orb=sphere(body,Vector3(0.39,0.48,0.39),Vector3(-0.50,1.60,-0.32),Color("ff6833"))
+		orb.material_override=mat(Color("ff6833"),true)
+		for i in range(5):
+			var bead=sphere(body,Vector3.ONE*0.10,Vector3(cos(i*TAU/5)*0.48,1.72,sin(i*TAU/5)*0.48),Color("f8b957"))
+			bead.material_override=mat(Color("f8b957"),true)
+	# Team color stays visible on the ground and on a small shoulder ribbon.
+	root.get_node("Selection").material_override=mat(team,true)
+	box(body,Vector3(0.11,0.27,0.07),Vector3(0.33,1.15,-0.16),team)
 	return root

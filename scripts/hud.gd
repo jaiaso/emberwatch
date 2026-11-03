@@ -1,5 +1,6 @@
 extends CanvasLayer
 
+const Heroes = preload("res://scripts/heroes.gd")
 const MiniMap = preload("res://scripts/minimap.gd")
 const Sim = preload("res://scripts/simulation.gd")
 const CREAM = Color("e4d8b7")
@@ -54,6 +55,12 @@ var bonus_panel: Panel
 var bonus_title: Label
 var bonus_summary: Label
 var paused_by_help = false
+var hero_picker: Panel
+var hero_cards: Dictionary = {}
+var hero_views: Array = []
+var hero_status: Button
+var hero_xp: ProgressBar
+var hero_hint: Label
 
 func setup(controller) -> void:
 	game = controller
@@ -85,10 +92,13 @@ func setup(controller) -> void:
 	_make_help()
 	_make_outcome()
 	_make_bonus()
+	_make_heroes()
 	_button(root, "画質 [F8]", Rect2(800,14,96,35), func(): game.toggle_quality())
 	audio_button = _button(root, "音 [M]", Rect2(908, 14, 80, 35), func(): game.sound.toggle())
 	Session.changed.connect(refresh_mode)
 	Session.message.connect(toast)
+	Session.message.connect(func(text):
+		if hero_picker.visible: hero_hint.text=text)
 	refresh_mode()
 
 func _style(bg: Color, border: Color) -> StyleBoxFlat:
@@ -184,7 +194,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.4.1     —     盾と騎兵", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.5.0     —     六人の英雄", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -192,7 +202,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.4.1", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.5.0", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -274,21 +284,21 @@ func _select_tab(index: int) -> void:
 		tab_buttons[i].modulate = Color("f2cf8c") if i == index else Color.WHITE
 
 func _make_lobby() -> void:
-	lobby = _panel(root, Rect2(338, 165, 476, 332), Color(0.05, 0.12, 0.10, 0.99))
+	lobby = _panel(root, Rect2(338, 130, 476, 430), Color(0.05, 0.12, 0.10, 0.99))
 	_label(lobby, "集 結 の 時", Vector2(28, 24), 25, GOLD)
 	_label(lobby, "最大4人で、ひとつの砦を守る。", Vector2(28, 77), 15)
 	lobby_status = _label(lobby, "", Vector2(28, 116), 13, MUTED)
-	lobby_status.size = Vector2(420, 100)
+	lobby_status.size = Vector2(420, 195)
 	lobby_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	start_button = _button(lobby, "全員で出陣", Rect2(28, 240, 270, 43), func(): Session.start(), true)
-	_button(lobby, "タイトルへ", Rect2(311, 240, 137, 43), func(): Session.back_to_menu())
-	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.2.0", Vector2(28, 298), 11, MUTED)
+	start_button = _button(lobby, "全員で出陣", Rect2(28, 336, 270, 43), func(): Session.start(), true)
+	_button(lobby, "タイトルへ", Rect2(311, 336, 137, 43), func(): Session.back_to_menu())
+	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.5.0", Vector2(28, 394), 11, MUTED)
 
 func _make_help() -> void:
 	help_panel = _panel(root, Rect2(230, 87, 692, 535), Color(0.05, 0.12, 0.10, 0.99))
 	_label(help_panel, "指 揮 官 の 手 引 き", Vector2(28, 23), 24, GOLD)
 	_label(help_panel, "左クリック / ドラッグ     自分の部隊を選択（Shiftで追加）\nダブルクリック                画面内の同じ兵種をまとめて選択\n右クリック                        移動 / 敵を攻撃 / 村人で資源を採集\nWASD / 矢印 / 中ボタン     カメラ移動\nホイール / Space              拡大縮小 / 中央砦へ戻る\n1 / 2 / 3 / 4 / C                  村人 / 剣士 / 弓兵 / 騎兵 / 取消\nB / N / T                              家 / 兵舎 / 監視塔を設置\nE / X / Y                               進軍攻撃 / 停止 / 新兵の集合地点\nF / V / Z                               全兵士 / 全村人 / 待機村人\nU / L / R                               武器強化 / 建物強化 / 砦の修復\nCtrl+6〜9 → 6〜9                部隊グループ登録 → 呼び出し\nP / F9 / M / F11                    一時停止 / セーブ / 消音 / 全画面", Vector2(29, 80), 13)
-	_label(help_panel, "最初はVで村人を選び、木・畑・金鉱を右クリック。\n6波目の敵と指揮官を倒せば勝利。中央砦が壊れると全員敗北。\nソロはこの画面で一時停止。オンライン中は時間が進みます。", Vector2(29, 397), 12, MUTED)
+	_label(help_panel, "Qで自分の英雄を選択・視点移動。自軍の撃破で成長、ウェーブ終了後に復活。\n最初はVで村人を選び、木・畑・金鉱を右クリック。6波撃退で勝利。\nソロはこの画面で一時停止。オンライン中は時間が進みます。", Vector2(29, 397), 12, MUTED)
 	_button(help_panel, "戦場へ戻る", Rect2(29, 477, 307, 38), toggle_help, true)
 	_button(help_panel, "タイトルへ戻る（退出）", Rect2(350, 477, 313, 38), func(): help_panel.hide(); paused_by_help = false; Session.back_to_menu())
 	help_panel.hide()
@@ -326,6 +336,7 @@ func refresh_mode() -> void:
 	play_ui.visible = active
 	lobby.visible = Session.mode in ["host", "client"] and not Session.sim.running and Session.sim.result == ""
 	start_button.visible = Session.mode == "host"
+	start_button.disabled = not Session.sim.heroes_ready()
 	outcome.visible = active and Session.sim.result != ""
 	if not active or outcome.visible:
 		help_panel.hide()
@@ -346,6 +357,30 @@ func _process(delta: float) -> void:
 		return
 	var sim = Session.sim
 	var player: Dictionary = sim.players.get(Session.local_id, {})
+	var picking=Session.mode in ["solo","host","client"] and sim.result=="" and sim.hero_selection_required and not player.is_empty() and player.get("hero","")==""
+	hero_picker.visible=picking
+	for view in hero_views:
+		view.render_target_update_mode=SubViewport.UPDATE_ALWAYS if picking else SubViewport.UPDATE_DISABLED
+	for key in hero_cards:
+		var owner=sim.hero_owner(key)
+		hero_cards[key].disabled=owner!=-1
+		hero_cards[key].text="確定して参戦" if owner==-1 else sim.players[owner].name+" が選択済み"
+	if picking:
+		lobby.hide()
+	else:
+		lobby.visible=Session.mode in ["host","client"] and not sim.running and sim.result==""
+	start_button.disabled=not sim.heroes_ready()
+	var hero: String=player.get("hero","")
+	hero_status.visible=hero!=""
+	hero_xp.visible=hero!=""
+	if hero!="":
+		var level=int(player.get("hero_level",1))
+		var unit: Dictionary=sim.units.get(player.get("hero_unit",-1),{})
+		var health="HP %d/%d" % [maxi(0,int(unit.hp)),int(unit.max_hp)] if not unit.is_empty() else "第%d波終了後に復活" % player.get("revive_wave",1)
+		var experience="MAX" if level==6 else "%d/%d XP" % [player.get("hero_xp",0),Heroes.next_xp(level)]
+		hero_status.text="[Q] %s  Lv%d   %s\n%s" % [Heroes.unit_name(hero),level,experience,health]
+		hero_status.tooltip_text=Heroes.DATA[hero].passive+"\n"+Heroes.DATA[hero].unlocks+"\n英雄：Lv毎に最大HP+8%・攻撃+10%（加算）。配下効果は戦死中も継続。"
+		hero_xp.value=1.0 if level==6 else float(player.get("hero_xp",0)-Heroes.XP[level-1])/(Heroes.next_xp(level)-Heroes.XP[level-1])
 	var points = player.get("skill_points", 0)
 	bonus_panel.visible = sim.running and points > 0 and Session.mode in ["solo", "host", "client"] and not help_panel.visible
 	bonus_title.text = "撃退ボーナス — スキルを1つ選択（残り%d）" % points
@@ -368,8 +403,20 @@ func _process(delta: float) -> void:
 	var counts = {"worker": 0, "soldier": 0, "archer": 0, "cavalry": 0}
 	for id in game.selected:
 		if sim.units.has(id):
-			counts[sim.units[id].kind] += 1
+			var role=Heroes.role(sim.units[id].kind)
+			if counts.has(role): counts[role] += 1
+			elif role=="mage": counts.archer += 1
 	selection_label.text = "部隊を選択" if game.selected.is_empty() else "%d部隊 · 村%d / 盾%d / 弓%d / 騎%d" % [game.selected.size(), counts.worker, counts.soldier, counts.archer, counts.cavalry]
+	if game.selected.size()==1 and sim.units.has(game.selected[0]) and Heroes.is_hero(sim.units[game.selected[0]].kind):
+		var selected_hero: Dictionary=sim.units[game.selected[0]]
+		selection_label.text=Heroes.unit_name(selected_hero.kind)+" Lv%d" % sim.players.get(selected_hero.owner,{}).get("hero_level",1)
+	for base in ["archer","cavalry"]:
+		var kind=sim.production_kind(Session.local_id,base)
+		var number="3" if base=="archer" else "4"
+		buttons[base].text="[%s] %s\n%s" % [number,Heroes.unit_name(kind),"木45 金25 /22秒" if base=="archer" else "食110 金70 /30秒"]
+		var sample={"kind":kind,"owner":Session.local_id}
+		var data: Dictionary=sim.unit_stats(sample)
+		buttons[base].tooltip_text="HP %d / 攻撃 %.1f / 軽減 %d%% / 速度 %.2f / 射程 %.1f" % [data.hp,data.damage,roundi(data.get("armor",0)*100),data.speed,data.range]
 	task_label.text = "%s  ·  %d人で防衛  ·  %s  ·  待機村人 %d" % [sim.players.get(Session.local_id, {}).get("name", "接続中"), sim.players.size(), Sim.DIFFICULTIES[sim.difficulty], sim.worker_count(true, Session.local_id)]
 	for key in ["house", "barracks", "tower"]:
 		buttons[key].disabled = counts.worker == 0 or not sim.running or not sim.can_afford(Sim.BUILD_DATA[key].cost)
@@ -386,7 +433,7 @@ func _process(delta: float) -> void:
 				queued += 1
 				if first.is_empty():
 					first = job
-	queue_label.text = "生産予約なし · ボタンで最大5人まで予約" if first.is_empty() else "%s  あと%.1f秒 · 自分の予約 %d" % [NAMES[first.kind], maxf(0, first.left), queued]
+	queue_label.text = "生産予約なし · ボタンで最大5人まで予約" if first.is_empty() else "%s  あと%.1f秒 · 自分の予約 %d" % [Heroes.unit_name(sim.production_kind(Session.local_id,first.kind)), maxf(0, first.left), queued]
 	queue_bar.value = 0.0 if first.is_empty() else 1.0 - first.left / first.total
 	buttons.pause.disabled = Session.mode != "solo"
 	buttons.save.disabled = Session.mode != "solo"
@@ -404,6 +451,9 @@ func _process(delta: float) -> void:
 	minimap.camera_center = game.camera_center
 	minimap.queue_redraw()
 	lobby_status.text = "%d / 4 人が集結  ·  %s\n%s" % [sim.players.size(), Sim.DIFFICULTIES[sim.difficulty], Session.status]
+	for id in sim.players:
+		var ally: Dictionary=sim.players[id]
+		lobby_status.text+="\n"+ally.name+"："+(Heroes.unit_name(ally.hero) if ally.get("hero","")!="" else "英雄を選択中…")
 	if Session.mode == "host":
 		lobby_status.text += "\n招待用IP：" + host_ips
 	mode_label.text = ""
@@ -431,3 +481,67 @@ func _make_bonus() -> void:
 		index += 1
 	bonus_summary = _label(bonus_panel, "", Vector2(24, 197), 13, MUTED)
 	bonus_panel.hide()
+
+
+func _make_heroes() -> void:
+	hero_status=_button(play_ui,"",Rect2(13,264,300,67),func(): game.focus_hero())
+	hero_status.add_theme_font_size_override("font_size",12)
+	hero_xp=_bar(play_ui,Rect2(13,333,300,5),GOLD)
+	hero_picker=_panel(root,Rect2(54,45,1044,630),Color(0.035,0.075,0.065,0.99))
+	_label(hero_picker,"英雄を選び、砦に集え",Vector2(20,14),27,GOLD)
+	_label(hero_picker,"1人1体・同じ英雄は選択できません。確定後は変更不可。全員の選択後、ホストが出陣します。",Vector2(20,56),13,MUTED)
+	var index=0
+	for key in Heroes.DATA:
+		var hero_key: String=key
+		var data: Dictionary=Heroes.DATA[key]
+		var card=_panel(hero_picker,Rect2(20+(index%3)*338,86+(index/3)*244,326,232),Color("142a24"))
+		var preview=SubViewportContainer.new()
+		preview.position=Vector2(8,8)
+		preview.size=Vector2(98,139)
+		preview.mouse_filter=Control.MOUSE_FILTER_IGNORE
+		card.add_child(preview)
+		var view=SubViewport.new()
+		view.size=Vector2i(196,278)
+		view.transparent_bg=true
+		view.own_world_3d=true
+		view.render_target_update_mode=SubViewport.UPDATE_DISABLED
+		preview.stretch=true
+		preview.add_child(view)
+		hero_views.append(view)
+		var scene=Node3D.new()
+		view.add_child(scene)
+		var model=game.art.make_unit(key,Color(data.color))
+		model.rotation.y=-0.35
+		scene.add_child(model)
+		var camera=Camera3D.new()
+		camera.projection=Camera3D.PROJECTION_ORTHOGONAL
+		camera.size=4.0 if Heroes.mounted(key) else 3.5
+		camera.position=Vector3(3,2.8,-5)
+		scene.add_child(camera)
+		camera.look_at(Vector3(0,1.5 if Heroes.mounted(key) else 1.35,0))
+		var light=DirectionalLight3D.new()
+		light.rotation_degrees=Vector3(-45,-30,0)
+		light.light_energy=1.6
+		scene.add_child(light)
+		var environment=WorldEnvironment.new()
+		environment.environment=Environment.new()
+		environment.environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
+		environment.environment.ambient_light_color=Color("cdd5ee")
+		environment.environment.ambient_light_energy=0.7
+		scene.add_child(environment)
+		_label(card,data.name,Vector2(114,10),18,Color(data.color))
+		_label(card,data.title,Vector2(115,38),12,MUTED)
+		var description=_label(card,data.passive,Vector2(115,63),11,CREAM)
+		description.size=Vector2(202,84)
+		description.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+		var unlock=_label(card,data.unlocks,Vector2(10,151),11,MUTED)
+		unlock.size=Vector2(308,41)
+		unlock.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+		hero_cards[key]=_button(card,"確定して参戦",Rect2(10,198,306,27),func(): Session.issue("hero",[],Vector2.ZERO,hero_key),true)
+		hero_cards[key].add_theme_font_size_override("font_size",12)
+		var stats: Dictionary=Sim.UNIT_DATA[key]
+		hero_cards[key].tooltip_text="初期能力：HP %d / 攻撃 %d / 軽減 %d%% / 速度 %.1f / 射程 %.1f" % [stats.hp,stats.damage,roundi(stats.get("armor",0)*100),stats.speed,stats.range]
+		index+=1
+	hero_hint=_label(hero_picker,"自軍の撃破で経験値 → 最大Lv6。戦死した英雄は、そのウェーブ終了後に砦で全回復して復活。",Vector2(20,585),12,GOLD)
+	_button(hero_picker,"タイトルへ",Rect2(901,10,122,32),func(): Session.back_to_menu())
+	hero_picker.hide()

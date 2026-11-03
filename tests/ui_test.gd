@@ -52,6 +52,9 @@ func run() -> void:
 	# Click the actual title button, then operate the normal input path.
 	await click(Vector2(200, 363))
 	check(session.mode == "solo" and session.sim.running and game.hud.play_ui.visible, "title button starts solo game")
+	session.issue("hero",[],Vector2.ZERO,"arthur")
+	await process_frame
+	await process_frame
 	if session.mode != "solo":
 		quit(1)
 		return
@@ -72,6 +75,7 @@ func run() -> void:
 	await process_frame
 	check(not game.hud.incoming_panel.visible, "no preview after final wave")
 	session.solo()
+	session.issue("hero",[],Vector2.ZERO,"arthur")
 	await process_frame
 	await process_frame
 	await key(KEY_V)
@@ -81,7 +85,7 @@ func run() -> void:
 	await key(KEY_ESCAPE)
 	check(game.build_mode == "" and not game.hud.help_panel.visible, "Escape cancels placement")
 	await key(KEY_F)
-	check(game.selected.size() == 3, "F selects starting combat army")
+	check(game.selected.size() == 4, "F selects starting combat army and hero")
 	await key(KEY_E)
 	check(game.attack_mode, "E activates attack-move")
 	var destination = Vector2(10, -5)
@@ -102,7 +106,7 @@ func run() -> void:
 	await key(KEY_6, true)
 	game.selected.clear()
 	await key(KEY_6)
-	check(game.selected.size() == 3, "control group restores army selection")
+	check(game.selected.size() == 4, "control group restores army and hero selection")
 	await key(KEY_P)
 	var before: float = session.sim.elapsed
 	session.sim.step(1)

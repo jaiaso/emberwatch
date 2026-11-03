@@ -6,6 +6,8 @@ func run() -> void:
 	var sim=Sim.new()
 	sim.reset()
 	sim.add_player(1)
+	var args=OS.get_cmdline_user_args()
+	sim.choose_hero(1,args[0] if not args.is_empty() else "arthur")
 	sim.running=true
 	var start=Time.get_ticks_msec()
 	var report=0

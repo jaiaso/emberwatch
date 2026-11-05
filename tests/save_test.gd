@@ -25,6 +25,7 @@ func run() -> void:
 	session.sim.elapsed = 121.5
 	session.sim.wave = 2
 	session.sim.cleared_wave = 2
+	session.sim.next_wave = session.sim.elapsed+300
 	var mounted=session.sim.spawn_unit("cavalry",Vector2(5,0),1)
 	session.sim.units[mounted].hp=60.0
 	session.sim.units[mounted].last_hit_at=120.0
@@ -33,6 +34,7 @@ func run() -> void:
 	check(session.save_game(false), "save succeeds")
 	session.back_to_menu()
 	check(session.continue_game(), "saved game resumes")
+	check(session.SAVE_VERSION=="1.5.0" and is_equal_approx(session.sim.next_wave-session.sim.elapsed,120),"hero save format remains compatible and old preparation is capped at two minutes")
 	check(session.mode == "solo" and session.sim.difficulty == 2 and session.sim.stock.food == 387, "save retains mode, difficulty and resources")
 	check(session.sim.elapsed == 121.5 and session.sim.next_id == next_id and session.sim.queued_population() == 1, "save retains time, unique IDs and queue")
 	check(session.sim.camps.size()==20 and session.sim.units.values().any(func(u): return u.get("guard",false) and u.has("home")), "save restores distant camps and guarding enemies")
@@ -41,10 +43,12 @@ func run() -> void:
 		session.sim.step(0.05)
 	check(session.sim.population() == 8, "saved queue finishes after resuming")
 	session.sim.paused = true
+	session.sim.next_wave=session.sim.elapsed+45
 	session.save_game(false)
 	session.back_to_menu()
 	session.continue_game()
 	check(not session.sim.paused, "resumed game starts unpaused")
+	check(is_equal_approx(session.sim.next_wave-session.sim.elapsed,45),"resume preserves a shorter remaining preparation")
 	var bytes = FileAccess.get_file_as_bytes(path)
 	bytes[bytes.size() - 1] = bytes[bytes.size() - 1] ^ 1
 	var file = FileAccess.open(path, FileAccess.WRITE)

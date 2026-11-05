@@ -194,7 +194,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.5.0     —     六人の英雄", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.5.1     —     六人の英雄", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -202,7 +202,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.5.0", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.5.1", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -292,7 +292,7 @@ func _make_lobby() -> void:
 	lobby_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	start_button = _button(lobby, "全員で出陣", Rect2(28, 336, 270, 43), func(): Session.start(), true)
 	_button(lobby, "タイトルへ", Rect2(311, 336, 137, 43), func(): Session.back_to_menu())
-	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.5.0", Vector2(28, 394), 11, MUTED)
+	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.5.1", Vector2(28, 394), 11, MUTED)
 
 func _make_help() -> void:
 	help_panel = _panel(root, Rect2(230, 87, 692, 535), Color(0.05, 0.12, 0.10, 0.99))
@@ -395,8 +395,8 @@ func _process(delta: float) -> void:
 	if not incoming.is_empty():
 		incoming_label.text = "準備：第%d波・%sから" % [incoming.wave, incoming.direction]
 	wave_label.text = "襲撃  %02d / 06" % sim.wave
-	var remain = int(maxf(0, sim.next_wave - sim.elapsed))
-	time_label.text = "襲撃敵 %d · 撃退後に5分準備" % sim.enemies_left() if sim.enemies_left()>0 else "準備時間 %02d:%02d" % [remain / 60, remain % 60] if sim.wave<6 else "最後の夜"
+	var remain = ceili(maxf(0, sim.next_wave - sim.elapsed))
+	time_label.text = "襲撃敵 %d · 撃退後に2分準備" % sim.enemies_left() if sim.enemies_left()>0 else "準備時間 %02d:%02d" % [remain / 60, remain % 60] if sim.wave<6 else "最後の夜"
 	var hall: Dictionary = sim.buildings.get(1, {})
 	hp_label.text = "中央砦  %d / %d" % [int(maxf(0, hall.get("hp", 0))), int(hall.get("max_hp", 1500))]
 	hp_bar.value = hall.get("hp", 0) / hall.get("max_hp", 1500.0)

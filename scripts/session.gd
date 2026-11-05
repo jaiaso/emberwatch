@@ -7,7 +7,8 @@ signal pinged(pos: Vector2)
 
 const Simulation = preload("res://scripts/simulation.gd")
 const PORT = 27840
-const VERSION = "1.5.0"
+const VERSION = "1.5.1"
+const SAVE_VERSION = "1.5.0" # Timer update preserves hero saves.
 const SAVE_PATH = "user://emberwatch-v15.save"
 const SAVE_MAGIC = "EMBERWATCH_SAVE_1"
 var sim = Simulation.new()
@@ -308,7 +309,7 @@ func save_game(notify: bool = true) -> bool:
 	if file == null:
 		message.emit("セーブできませんでした。")
 		return false
-	var payload = var_to_bytes({"version": VERSION, "state": sim.snapshot()})
+	var payload = var_to_bytes({"version": SAVE_VERSION, "state": sim.snapshot()})
 	var hash = HashingContext.new()
 	hash.start(HashingContext.HASH_SHA256)
 	hash.update(payload)
@@ -346,7 +347,7 @@ func continue_game() -> bool:
 	if hash.finish() != expected:
 		return false
 	var data = bytes_to_var(payload)
-	if not data is Dictionary or data.get("version", "") != VERSION or not data.get("state", {}) is Dictionary:
+	if not data is Dictionary or data.get("version", "") != SAVE_VERSION or not data.get("state", {}) is Dictionary:
 		status = "セーブデータを読み込めませんでした。"
 		changed.emit()
 		return false
@@ -356,6 +357,7 @@ func continue_game() -> bool:
 			return false
 	back_to_menu()
 	sim.apply_snapshot(state)
+	sim.next_wave = minf(sim.next_wave,sim.elapsed+Simulation.PREPARATION_TIME)
 	sim.paused = false
 	saved_wave = sim.cleared_wave
 	mode = "solo"

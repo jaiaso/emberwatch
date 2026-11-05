@@ -13,7 +13,7 @@ func run() -> void:
 	var sim=Sim.new()
 	sim.reset()
 	sim.add_player(1)
-	check(sim.next_wave==300 and sim.camps.size()==20,"five minute start and twenty resource camps")
+	check(sim.next_wave==120 and sim.camps.size()==20,"two minute start and twenty resource camps")
 	var totals={1:{},2:{},3:{}}
 	for camp in sim.camps.values():
 		check(sim.camp_amount(camp.id)>0,"nonempty camp")
@@ -58,26 +58,26 @@ func run() -> void:
 	var copy=Sim.new()
 	copy.apply_snapshot(sim.snapshot())
 	check(copy.camps==sim.camps and copy.units[guard.id].home==guard.home,"camp and guard state survives snapshot/save")
-	# Isolate the countdown boundary without waiting five real minutes.
+	# Isolate the countdown boundary without waiting two real minutes.
 	sim=Sim.new()
 	sim.reset()
 	sim.add_player(1)
 	sim.running=true
-	sim.elapsed=299.90
+	sim.elapsed=119.90
 	sim.step(0.05)
-	check(sim.wave==0,"wave never starts before five minutes")
+	check(sim.wave==0,"wave never starts before two minutes")
 	sim.step(0.06)
-	check(sim.wave==1 and sim.enemies_left()==16,"first wave starts at five minutes despite living guards")
+	check(sim.wave==1 and sim.enemies_left()==16,"first wave starts at two minutes despite living guards")
 	for id in sim.units.keys():
 		if sim.units[id].owner==0 and not sim.units[id].get("guard",false):
 			sim.units.erase(id)
 	sim.step(0.05)
-	check(is_equal_approx(sim.next_wave-sim.elapsed,300),"full five minutes begins after clearance")
+	check(is_equal_approx(sim.next_wave-sim.elapsed,120),"full two minutes begins after clearance")
 	check(sim.players[1].skill_points==1 and sim.cleared_wave==1,"living guards do not block wave rewards")
 	sim.command(1,"skill",[],Vector2.ZERO,"power")
 	sim.elapsed=sim.next_wave-0.1
 	sim.step(0.05)
-	check(sim.wave==1,"intermission lasts five minutes")
+	check(sim.wave==1,"intermission lasts two minutes")
 	sim.step(0.06)
 	check(sim.wave==2,"second wave starts at end of intermission")
 	sim.units=sim.units.duplicate(true)
@@ -90,7 +90,7 @@ func run() -> void:
 	var session=root.get_node("Session")
 	for level in range(3):
 		session.solo(level)
-		check(session.sim.next_wave==300,"all difficulties start with five minute preparation")
+		check(session.sim.next_wave==120,"all difficulties start with two minute preparation")
 		var first_guard={}
 		for unit in session.sim.units.values():
 			if unit.get("guard",false):
@@ -98,6 +98,6 @@ func run() -> void:
 				break
 		check(is_equal_approx(first_guard.max_hp,Sim.UNIT_DATA[first_guard.kind].hp*[0.78,1.0,1.25][level]),"new camp guards use chosen difficulty")
 	session.rematch()
-	check(session.sim.next_wave==300,"rematch resets five minute timer")
+	check(session.sim.next_wave==120,"rematch resets two minute timer")
 	print("EXPEDITION_TEST ",checks-failures.size(),"/",checks," PASS ",failures)
 	quit(0 if failures.is_empty() else 1)

@@ -194,7 +194,7 @@ func _make_title() -> void:
 	menu_status.size = Vector2(373, 56)
 	menu_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_label(menu, "1–4 PLAYERS    /    SHARED RESOURCES", Vector2(29, 546), 11, MUTED)
-	_label(menu, "VERSION 1.5.1     —     六人の英雄", Vector2(29, 577), 12, GOLD)
+	_label(menu, "VERSION 1.5.2     —     六人の英雄", Vector2(29, 577), 12, GOLD)
 
 func _make_play_ui() -> void:
 	play_ui = Control.new()
@@ -202,7 +202,7 @@ func _make_play_ui() -> void:
 	root.add_child(play_ui)
 	_panel(play_ui, Rect2(0, 0, 1152, 64), Color("11261f"))
 	_label(play_ui, "EMBERWATCH", Vector2(22, 9), 21)
-	_label(play_ui, "灰の砦  /  VERSION 1.5.1", Vector2(24, 39), 10, MUTED)
+	_label(play_ui, "灰の砦  /  VERSION 1.5.2", Vector2(24, 39), 10, MUTED)
 	resources_label = _label(play_ui, "", Vector2(279, 20), 17)
 	_button(play_ui, "操作 [H]", Rect2(1000, 14, 128, 35), toggle_help)
 	var objective_bg = _panel(play_ui, Rect2(13, 77, 324, 65), Color(0.05, 0.12, 0.10, 0.90))
@@ -292,7 +292,7 @@ func _make_lobby() -> void:
 	lobby_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	start_button = _button(lobby, "全員で出陣", Rect2(28, 336, 270, 43), func(): Session.start(), true)
 	_button(lobby, "タイトルへ", Rect2(311, 336, 137, 43), func(): Session.back_to_menu())
-	_label(lobby, "UDP 27840 · 途中参加可能 · 全員 v1.5.1", Vector2(28, 394), 11, MUTED)
+	_label(lobby, "UDP 27840 · 途中参加可能 · v1.5.1 / v1.5.2", Vector2(28, 394), 11, MUTED)
 
 func _make_help() -> void:
 	help_panel = _panel(root, Rect2(230, 87, 692, 535), Color(0.05, 0.12, 0.10, 0.99))
@@ -389,7 +389,10 @@ func _process(delta: float) -> void:
 	audio_button.text = "消音 [M]" if game.sound.muted else "音 [M]"
 	if sim.result != "" and not outcome.visible:
 		refresh_mode()
-	resources_label.text = "食料 %d    木 %d    金 %d    人口 %d+%d/%d" % [sim.stock.food, sim.stock.wood, sim.stock.gold, sim.population(), sim.queued_population(), sim.capacity()]
+	var population = sim.population()
+	var queued_population = sim.queued_population()
+	var capacity = sim.capacity()
+	resources_label.text = "食料 %d    木 %d    金 %d    人口 %d+%d/%d" % [sim.stock.food, sim.stock.wood, sim.stock.gold, population, queued_population, capacity]
 	var incoming: Dictionary = sim.incoming_attack()
 	incoming_panel.visible = not incoming.is_empty()
 	if not incoming.is_empty():
@@ -421,7 +424,7 @@ func _process(delta: float) -> void:
 	for key in ["house", "barracks", "tower"]:
 		buttons[key].disabled = counts.worker == 0 or not sim.running or not sim.can_afford(Sim.BUILD_DATA[key].cost)
 	for key in ["worker", "soldier", "archer", "cavalry"]:
-		buttons[key].disabled = not sim.running or not sim.can_afford(Sim.UNIT_DATA[key].cost) or sim.population() + sim.queued_population() >= sim.capacity()
+		buttons[key].disabled = not sim.running or not sim.can_afford(Sim.UNIT_DATA[key].cost) or population + queued_population >= capacity
 	for key in ["weapons", "masonry"]:
 		buttons[key].disabled = sim.upgrades[key] or not sim.can_afford(Sim.RESEARCH[key].cost)
 		buttons[key].tooltip_text = "研究済み・味方全員に適用" if sim.upgrades[key] else "共有資源を消費。味方全員に適用します。"

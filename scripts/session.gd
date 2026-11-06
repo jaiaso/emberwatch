@@ -7,7 +7,7 @@ signal pinged(pos: Vector2)
 
 const Simulation = preload("res://scripts/simulation.gd")
 const PORT = 27840
-const VERSION = "1.5.1"
+const VERSION = "1.5.1" # Network protocol shared by v1.5.1 and v1.5.2.
 const SAVE_VERSION = "1.5.0" # Timer update preserves hero saves.
 const SAVE_PATH = "user://emberwatch-v15.save"
 const SAVE_MAGIC = "EMBERWATCH_SAVE_1"
@@ -149,7 +149,7 @@ func _hello(version: String) -> void:
 @rpc("authority", "call_remote", "reliable", 0)
 func _reject() -> void:
 	back_to_menu()
-	status = "バージョンが違います。全員 v%s を使用してください。" % VERSION
+	status = "バージョンが違います。対応版 v1.5.1 / v1.5.2 を使用してください。"
 	changed.emit()
 
 func _peer_disconnected(id: int) -> void:

@@ -594,11 +594,11 @@ func _draw_overlay() -> void:
 			ring.append(camera.unproject_position(Vector3(point.x,0.05,point.y)))
 		overlay.draw_polyline(ring,Color(0.40,0.85,0.64,0.28),1.4)
 	for camp in Session.sim.camps.values():
-		var amount = Session.sim.camp_amount(camp.id)
-		if amount <= 0:
-			continue
 		var rp = camera.unproject_position(Vector3(camp.p.x,3.0,camp.p.y))
 		if Rect2(80,145,990,335).has_point(rp):
+			var amount = Session.sim.camp_amount(camp.id)
+			if amount <= 0:
+				continue
 			var guards = Session.sim.camp_guards(camp.id)
 			var text = "%s%s · %d / 守備%d" % [["小規模 ","中規模 ","大規模 "][camp.tier-1], {"wood":"森林","food":"畑","gold":"金鉱"}[camp.kind], amount,guards]
 			var font = hud.root.get_theme_default_font()

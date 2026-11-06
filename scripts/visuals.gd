@@ -5,6 +5,9 @@ const Heroes = preload("res://scripts/heroes.gd")
 const TEAM = [Color("79c5b3"), Color("e6b960"), Color("9ca7e6"), Color("d994b0")]
 var materials: Dictionary = {}
 var sphere_mesh: SphereMesh
+var box_meshes: Dictionary = {}
+var cylinder_meshes: Dictionary = {}
+var farm_pieces: Array[Dictionary] = []
 
 func mat(color: Color, glow: bool = false) -> Material:
 	var key = str(color) + str(glow)
@@ -32,12 +35,13 @@ func mat(color: Color, glow: bool = false) -> Material:
 	return material
 
 func sphere(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
-	var mesh = SphereMesh.new()
-	mesh.radial_segments = 24
-	mesh.rings = 32
-	mesh.radius = 0.5
-	mesh.height = 1.0
-	var node = piece(parent, mesh, pos, color)
+	if sphere_mesh == null:
+		sphere_mesh = SphereMesh.new()
+		sphere_mesh.radial_segments = 24
+		sphere_mesh.rings = 32
+		sphere_mesh.radius = 0.5
+		sphere_mesh.height = 1.0
+	var node = piece(parent, sphere_mesh, pos, color)
 	node.scale = size
 	return node
 
@@ -52,17 +56,24 @@ func limb(parent: Node3D, name_value: String, pos: Vector3, color: Color, leg: b
 	return pivot
 
 func box(parent: Node3D, size: Vector3, pos: Vector3, color: Color) -> MeshInstance3D:
-	var mesh = BoxMesh.new()
-	mesh.size = size
+	var mesh: BoxMesh = box_meshes.get(size)
+	if mesh == null:
+		mesh = BoxMesh.new()
+		mesh.size = size
+		box_meshes[size] = mesh
 	return piece(parent, mesh, pos, color)
 
 func cylinder(parent: Node3D, bottom: float, top: float, height: float, pos: Vector3, color: Color, sides: int = 24) -> MeshInstance3D:
-	var mesh = CylinderMesh.new()
-	mesh.bottom_radius = bottom
-	mesh.top_radius = top
-	mesh.height = height
-	mesh.radial_segments = sides
-	mesh.rings = 3
+	var key = Vector4(bottom, top, height, sides)
+	var mesh: CylinderMesh = cylinder_meshes.get(key)
+	if mesh == null:
+		mesh = CylinderMesh.new()
+		mesh.bottom_radius = bottom
+		mesh.top_radius = top
+		mesh.height = height
+		mesh.radial_segments = sides
+		mesh.rings = 3
+		cylinder_meshes[key] = mesh
 	return piece(parent, mesh, pos, color)
 
 func piece(parent: Node3D, mesh: Mesh, pos: Vector3, color: Color) -> MeshInstance3D:
@@ -257,9 +268,17 @@ func make_building(kind: String, team: Color) -> Node3D:
 	return root
 
 func make_resource(kind: String, seed_value: int) -> Node3D:
+	var root = Node3D.new()
+	# Every farm has the same geometry. Each node still controls its own visibility and scale.
+	if kind == "food" and not farm_pieces.is_empty():
+		for part in farm_pieces:
+			var instance = MeshInstance3D.new()
+			instance.mesh = part.mesh
+			instance.material_override = part.material
+			root.add_child(instance)
+		return root
 	var random = RandomNumberGenerator.new()
 	random.seed = seed_value * 93
-	var root = Node3D.new()
 	if kind == "wood":
 		var height = random.randf_range(3.6,5.3)
 		cylinder(root,0.24,0.09,height*0.8,Vector3(0,height*0.4,0),Color("644b36"),18)
@@ -300,6 +319,9 @@ func make_resource(kind: String, seed_value: int) -> Node3D:
 			box(root, Vector3(0.35, 0.18, 0.40), pos + Vector3(0.18, 0.20, -0.30), Color("f7b92a"))
 
 	batch_static(root)
+	if kind == "food":
+		for node in root.get_children():
+			farm_pieces.append({"mesh": node.mesh, "material": node.material_override})
 	root.rotation.y = random.randf_range(-PI, PI) if kind == "wood" else 0.0
 	return root
 

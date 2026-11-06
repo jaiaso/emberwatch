@@ -11,8 +11,14 @@ static func blocked(pos: Vector2, margin: float = 0.55) -> bool:
 	return false
 
 static func crosses(a: Vector2, b: Vector2) -> bool:
+	var min_x = minf(a.x, b.x)
+	var max_x = maxf(a.x, b.x)
+	var min_y = minf(a.y, b.y)
+	var max_y = maxf(a.y, b.y)
 	for cliff in CLIFFS:
 		var rect: Rect2 = cliff.grow(0.55)
+		if max_x < rect.position.x or min_x > rect.end.x or max_y < rect.position.y or min_y > rect.end.y:
+			continue
 		if rect.has_point(a) or rect.has_point(b):
 			return true
 		var corners = [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]
